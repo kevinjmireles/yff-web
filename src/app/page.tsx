@@ -75,6 +75,20 @@ function SignupForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name (Optional)</label>
+          <input
+            id="name"
+            name="name"
+            type="text"
+            value={formData.name}
+            onChange={onChange('name')}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Your full name"
+            disabled={isSubmitting}
+          />
+        </div>
+
+        <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email Address *</label>
           <input
             id="email"
@@ -85,20 +99,6 @@ function SignupForm() {
             onChange={onChange('email')}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="your.email@example.com"
-            disabled={isSubmitting}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name (Optional)</label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            value={formData.name}
-            onChange={onChange('name')}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Your full name"
             disabled={isSubmitting}
           />
         </div>
@@ -150,7 +150,7 @@ function SignupForm() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Signing Up...
+              Finding Your Districts...
             </>
           ) : (
             'Sign Up Today'
@@ -172,7 +172,7 @@ function SignupForm() {
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-green-800">🎉 Welcome to Your Friend Fido!</h3>
                   <div className="mt-1 text-sm text-green-700">
-                    <p>{result.message}</p>
+                    <p>{'Thanks for signing up—watch your inbox!'}</p>
                   </div>
                 </div>
               </div>
@@ -185,10 +185,10 @@ function SignupForm() {
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">Signup Failed</h3>
-                  <div className="mt-1 text-sm text-red-700"><p>{result.error}</p></div>
-                </div>
+                                 <div className="ml-3">
+                   <h3 className="text-sm font-medium text-red-800">Signup Failed</h3>
+                   <div className="mt-1 text-sm text-red-700"><p>{result.error}</p></div>
+                 </div>
               </div>
             </div>
           )}
@@ -205,22 +205,15 @@ export default function Home() {
         {/* Header with Logo */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Image
-              src="/Fido Logo V1.jpg"
-              alt="Your Friend Fido Logo"
-              width={300}
-              height={120}
-              className="h-24 w-auto"
-              priority
-            />
+            <Image src="/Fido Logo.png" alt="Your Friend Fido" width={200} height={80} className="h-20 w-auto" priority />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Tired of reading the news and still not knowing how it affects you?</h1>
           <div className="text-xl text-gray-600 mb-6 max-w-2xl mx-auto">
-            <ul className="space-y-1 text-center">
-              <li>• What does this mean for your community?</li>
-              <li>• Where do your elected officials stand?</li>
-              <li>• How can you give them feedback?</li>
-            </ul>
+                         <ul className="space-y-1 text-center">
+               <li>• What does this mean for your community?</li>
+               <li>• Where do your elected officials stand?</li>
+               <li>• How can you give them feedback?</li>
+             </ul>
           </div>
           <div className="w-24 h-1 bg-blue-500 mx-auto rounded mb-6"></div>
         </div>
@@ -260,7 +253,7 @@ export default function Home() {
             </a>
             <Link href="/admin" className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1 1 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066 2.573c-.94 1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1 1 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
               Admin Access
