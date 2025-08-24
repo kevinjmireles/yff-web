@@ -1,75 +1,91 @@
--- YFF V2.1 Consolidated SQL Patch
--- Run this in Supabase SQL Editor to create all tables, policies, and indexes
+-- YFF V2.1 — Consolidated SQL (Corrected Policy Syntax)
+-- Safe to run multiple times; uses IF NOT EXISTS and DROP POLICY IF EXISTS where helpful.
 
--- ============================================================================
--- PROFILES TABLE
--- ============================================================================
+-- Recommended in Supabase (usually enabled already)
+create extension if not exists pgcrypto;
+
+-- =========================
+-- PROFILES & SUBSCRIPTIONS
+-- =========================
 
 create table if not exists profiles (
   user_id uuid primary key default gen_random_uuid(),
   email text unique not null,
   address text,
   zipcode text,
-  ocd_ids text[] default '{}',
+  ocd_ids text[] default '{}'::text[],
   ocd_last_verified_at timestamptz,
   created_at timestamptz default now()
 );
 
--- RLS Policies for Profiles
-alter table profiles enable row level security;
-
--- Only authenticated owner can read/update (if exposed from client)
-create policy "profiles_owner_read"
-  on profiles for select
-  using (auth.uid() = user_id);
-
-create policy "profiles_owner_update"
-  on profiles for update
-  using (auth.uid() = user_id);
-
--- Indexes
-create unique index if not exists idx_profiles_email_unique on profiles (email);
-
--- ============================================================================
--- SUBSCRIPTIONS TABLE
--- ============================================================================
-
 create table if not exists subscriptions (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references profiles(user_id) on delete cascade,
+  user_id uuid not null references profiles(user_id) on delete cascade,
   list_key text not null default 'general',
-  unsubscribed_at timestamptz
+  unsubscribed_at timestamptz,
+  created_at timestamptz default now(),
+  unique (user_id, list_key)
 );
 
--- RLS Policies for Subscriptions
+-- Enable RLS
+alter table profiles enable row level security;
 alter table subscriptions enable row level security;
 
-create policy "subscriptions_owner_read"
-  on subscriptions for select
-  using (auth.uid() = user_id);
+-- Clean up any previous policies to avoid duplicates / bad syntax
+drop policy if exists profiles_owner_read   on profiles;
+drop policy if exists profiles_owner_update on profiles;
+drop policy if exists subscriptions_owner_read   on subscriptions;
+drop policy if exists subscriptions_owner_insert on subscriptions;
+drop policy if exists subscriptions_owner_update on subscriptions;
 
-create policy "subscriptions_owner_upsert"
-  on subscriptions for insert with check (auth.uid() = user_id)
-  to authenticated;
+-- Owner-only (if ever exposed from client). Service role bypasses RLS.
+create policy profiles_owner_read
+on profiles
+for select
+to authenticated
+using (auth.uid() = user_id);
 
--- Indexes
-create unique index if not exists idx_subscriptions_unique on subscriptions (user_id, list_key);
+create policy profiles_owner_update
+on profiles
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
 
--- ============================================================================
--- CONTENT SLICES TABLE
--- ============================================================================
+create policy subscriptions_owner_read
+on subscriptions
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy subscriptions_owner_insert
+on subscriptions
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy subscriptions_owner_update
+on subscriptions
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+-- =========================
+-- CONTENT SLICES (service-only)
+-- =========================
 
 create table if not exists content_slices (
   id uuid primary key default gen_random_uuid(),
-  article_key text not null,                -- groups slices into one article
-  section_order int not null default 1,     -- vertical order within article
-  is_headline boolean default false,        -- scoped headline (optional, V2-friendly)
+  article_key text not null,
+  section_order int not null default 1,
+  is_headline boolean default false,
   title text,
   dek text,
-  body_md text,                             -- markdown allowed
+  body_md text,
   link_url text,
-  scope_ocd_id text,                        -- null = global (applies to everyone)
-  tags text[] default '{}',
+  scope_ocd_id text,
+  tags text[] default '{}'::text[],
   publish_status text not null default 'draft',  -- draft|published|archived
   publish_at timestamptz,
   expires_at timestamptz,
@@ -77,21 +93,23 @@ create table if not exists content_slices (
   created_at timestamptz default now()
 );
 
--- RLS: Service role access only (no public access)
+create index if not exists idx_slices_article on content_slices(article_key);
+create index if not exists idx_slices_scope  on content_slices(scope_ocd_id);
+
 alter table content_slices enable row level security;
-create policy "content_service_only" on content_slices for all using (false);
+drop policy if exists content_service_only on content_slices;
+create policy content_service_only
+on content_slices
+for all
+using (false);
 
--- Indexes
-create index if not exists idx_content_slices_article_key on content_slices(article_key);
-create index if not exists idx_content_slices_scope_ocd on content_slices(scope_ocd_id);
-
--- Idempotent key for upserts
-create unique index if not exists idx_content_key
+-- Idempotent composite key for importer
+create unique index if not exists idx_slice_dedupe
   on content_slices (article_key, section_order, coalesce(scope_ocd_id,''), sort_index);
 
--- ============================================================================
--- DELIVERY TABLES
--- ============================================================================
+-- =========================
+-- DELIVERY (service-only)
+-- =========================
 
 create table if not exists delivery_history (
   id uuid primary key default gen_random_uuid(),
@@ -99,7 +117,9 @@ create table if not exists delivery_history (
   campaign_tag text not null,
   send_batch_id text not null,              -- idempotency token
   provider_message_id text,                 -- from SendGrid
-  sent_at timestamptz default now()
+  sent_at timestamptz default now(),
+  unique (provider_message_id),
+  unique (email, campaign_tag, send_batch_id)
 );
 
 create table if not exists delivery_events (
@@ -110,23 +130,35 @@ create table if not exists delivery_events (
   event_at timestamptz default now()
 );
 
--- RLS: Service role access only (no public access)
 alter table delivery_history enable row level security;
-alter table delivery_events enable row level security;
-create policy "delivery_service_only_history" on delivery_history for all using (false);
-create policy "delivery_service_only_events" on delivery_events for all using (false);
+alter table delivery_events  enable row level security;
 
--- Indexes
-create unique index if not exists idx_delivery_dedupe
-  on delivery_history (email, campaign_tag, send_batch_id);
-create index if not exists idx_delivery_events_email_type
-  on delivery_events (email, event_type);
+drop policy if exists hist_service_only on delivery_history;
+drop policy if exists ev_service_only   on delivery_events;
 
--- ============================================================================
--- OPTIONAL TABLES (for advanced features)
--- ============================================================================
+create policy hist_service_only
+on delivery_history
+for all
+using (false);
 
--- Dead letters table for failed operations
+create policy ev_service_only
+on delivery_events
+for all
+using (false);
+
+-- =========================
+-- AUDIT & DEAD LETTERS (service-only)
+-- =========================
+
+create table if not exists campaign_runs (
+  id uuid primary key default gen_random_uuid(),
+  campaign_tag text not null,
+  article_key text not null,
+  actor text not null,           -- admin identity/email
+  send_batch_id text not null,
+  started_at timestamptz default now()
+);
+
 create table if not exists dead_letters (
   id uuid primary key default gen_random_uuid(),
   topic text not null,           -- e.g., 'send'
@@ -135,45 +167,18 @@ create table if not exists dead_letters (
   created_at timestamptz default now()
 );
 
--- Campaign runs audit trail
-create table if not exists campaign_runs (
-  id uuid primary key default gen_random_uuid(),
-  campaign_tag text not null,
-  article_key text not null,
-  actor text not null,           -- email/subject of admin
-  send_batch_id text not null,
-  started_at timestamptz default now()
-);
+alter table campaign_runs enable row level security;
+alter table dead_letters  enable row level security;
 
--- Health pings for monitoring
-create table if not exists health_pings (
-  id uuid primary key default gen_random_uuid(),
-  service text not null,         -- 'make', 'edge-function', etc.
-  status text not null,          -- 'ok', 'error'
-  details jsonb,
-  created_at timestamptz default now()
-);
+drop policy if exists runs_service_only on campaign_runs;
+drop policy if exists dead_service_only on dead_letters;
 
--- ============================================================================
--- VERIFICATION QUERIES
--- ============================================================================
+create policy runs_service_only
+on campaign_runs
+for all
+using (false);
 
--- Check that all tables exist
-select table_name, table_type 
-from information_schema.tables 
-where table_schema = 'public' 
-and table_name in ('profiles', 'subscriptions', 'content_slices', 'delivery_history', 'delivery_events')
-order by table_name;
-
--- Check RLS policies
-select schemaname, tablename, policyname, permissive, roles, cmd, qual
-from pg_policies 
-where schemaname = 'public'
-order by tablename, policyname;
-
--- Check indexes
-select schemaname, tablename, indexname, indexdef
-from pg_indexes 
-where schemaname = 'public'
-and tablename in ('profiles', 'subscriptions', 'content_slices', 'delivery_history', 'delivery_events')
-order by tablename, indexname;
+create policy dead_service_only
+on dead_letters
+for all
+using (false);
