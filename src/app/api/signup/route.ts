@@ -5,11 +5,21 @@
  */
 
 import { NextResponse } from 'next/server'
+import { checkRateLimit } from '@/lib/rateLimiter'
 
 const RECAPTCHA_URL = 'https://www.google.com/recaptcha/api/siteverify'
 
 export async function POST(req: Request) {
   try {
+    // Rate limiting - 5 requests per minute per IP
+    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    if (!checkRateLimit(clientIP, 5, 60000)) {
+      return NextResponse.json(
+        { success: false, error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      )
+    }
+
     const { name, email, address, recaptchaToken } = await req.json()
 
     if (!email || !address) {

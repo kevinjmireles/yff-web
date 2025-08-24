@@ -1,0 +1,13 @@
+table_name,columns_in_db,rows_estimated,in_data_dictionary,used_in_mvp,notes
+audience_members,8,0,Yes,Yes,"New table for campaign imports (CSV _ upsert). Unique (email,campaign_tag), ocd_id filter."
+backup_official_contacts_2025...,6,1074,No,No,Legacy backup; not part of MVP.
+backup_officials,10,541,No,No,Legacy backup; not part of MVP.
+content_blocks,9,0,No,No,Legacy content CMS; not part of MVP.
+content_datasets,5,9,No,No,Legacy content CMS; not part of MVP.
+content_items,14,35,No,No,Legacy content CMS; not part of MVP.
+delivery_events,5,1,Yes,Yes,"MVP table for SendGrid webhook events (delivered, open, click, bounce, unsubscribe)."
+delivery_history,11,299,Yes,Yes,MVP table for logging sends; dedupe with send_batch_id & provider_message_id.
+official_contacts,7,8,No,Optional,"Legacy officials data. Could be reused later, not needed for MVP."
+officials,11,537,No,Optional,"Legacy officials data. Could be reused later, not needed for MVP."
+provider_events,4,4,No,No,Superseded by delivery_events; legacy only.
+subscribers,12,8,Yes (legacy note only),No,Legacy profile table. MVP uses audience_members instead.

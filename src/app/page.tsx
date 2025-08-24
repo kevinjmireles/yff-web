@@ -13,6 +13,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useRef } from 'react'
 import ReCAPTCHA from 'react-google-recaptcha'
+import Footer from '@/components/Footer'
 
 type SignupResult =
   | { success: true; message: string; data?: { districtsFound?: number; subscriberId?: string } }
@@ -234,7 +235,7 @@ export default function Home() {
           <div className="flex items-center">
             <div className="text-center md:text-left">
               <h2 className="text-3xl font-bold text-gray-900 mb-3">Reclaim your power. Rediscover your democracy.</h2>
-              <p className="text-xl text-gray-600 mb-6">Sign up today and join the movement to bring journalism and civic life into the 21st century.</p>
+              <p className="text-xl text-gray-600 mb-6">Sign up today and join the movement to bring journalism and civic engagement into the 21st century.</p>
             </div>
           </div>
           <div><SignupForm /></div>
@@ -269,6 +270,8 @@ export default function Home() {
           </div>
         </div>
       </div>
+      
+      <Footer />
     </div>
   )
 }
