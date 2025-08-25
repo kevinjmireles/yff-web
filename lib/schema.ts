@@ -6,12 +6,16 @@ export const signupSchema = z.object({
 });
 export type SignupInput = z.infer<typeof signupSchema>;
 
-export const campaignSchema = z.object({
+export const adminTriggerSchema = z.object({
   campaign_tag: z.string().min(1),
   subject: z.string().min(1),
   body_template_id: z.string().min(1),
   audience_filter: z.record(z.any()).optional(),
   test_recipients: z.array(z.string().email()).optional(),
 });
-export type CampaignInput = z.infer<typeof campaignSchema>;
+export type AdminTriggerInput = z.infer<typeof adminTriggerSchema>;
+
+// Legacy alias for backward compatibility
+export const campaignSchema = adminTriggerSchema;
+export type CampaignInput = AdminTriggerInput;
 

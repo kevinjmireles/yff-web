@@ -1,42 +1,33 @@
-// Purpose: Allow users to view and update their subscription preferences.
-// Called by: User navigation.
-'use client'
-
-import { useState } from 'react'
-import { APP_NAME } from '@/lib/constants'
+// Purpose: User preferences page for managing subscription settings.
+// Called by: Navigation links from homepage and other pages.
+// Status: Placeholder - will be wired to Edge Functions later.
 
 export default function PreferencesPage() {
-  const [status, setStatus] = useState('')
-
-  // Stub handler for now
-  async function onUpdatePreferences(e: React.FormEvent) {
-    e.preventDefault()
-    console.log('Preferences update not wired yet.')
-    setStatus('Preference updates are not enabled yet.')
-  }
-
   return (
-    <main className="p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">{APP_NAME} Preferences</h1>
-      <p className="mb-4">
-        Your email: <strong>user@example.com</strong>
-      </p>
-
-      <form onSubmit={onUpdatePreferences} className="space-y-3">
-        <p>Your current subscriptions:</p>
-        <ul className="list-disc list-inside">
-          <li>City Council Meetings</li>
-          <li>Mayoral Race Updates</li>
-        </ul>
-        <button
-          type="submit"
-          className="px-4 py-2 bg-black text-white rounded"
-        >
-          Update (not wired)
-        </button>
-      </form>
-
-      {status && <p className="mt-3">{status}</p>}
-    </main>
-  )
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Manage Your Preferences</h1>
+          <p className="text-xl text-gray-600">Control how you receive updates from Your Friend Fido</p>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-xl p-8">
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🔧</div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Preferences Management</h2>
+            <p className="text-gray-600 mb-6">
+              This page will allow you to manage your subscription preferences, 
+              update your address, and control notification settings.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <p className="text-blue-800 text-sm">
+                <strong>Coming Soon:</strong> Full preferences management will be available 
+                after we complete the Edge Function integration.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

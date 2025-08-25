@@ -23,6 +23,9 @@ RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key
 
 # Make.com Webhook
 NEXT_PUBLIC_MAKE_WEBHOOK_URL=your_make_webhook_url
+
+# Edge Function Security
+EDGE_SHARED_SECRET=your_shared_secret_for_edge_functions
 ```
 
 ### **Local Development (.env.local):**
@@ -46,6 +49,9 @@ RECAPTCHA_SECRET_KEY=
 
 # Make.com Webhook (Optional in dev)
 NEXT_PUBLIC_MAKE_WEBHOOK_URL=
+
+# Edge Function Security (Required for Edge Function calls)
+EDGE_SHARED_SECRET=your_shared_secret_here
 ```
 
 ## 🔧 **Setup Instructions:**
