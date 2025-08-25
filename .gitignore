@@ -40,5 +40,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Env files (NEVER COMMIT SECRETS)
+.env
+.env.*
+!.env.example
+!.env.local.example
+
 # Supabase CLI temp files
 supabase/.temp/
