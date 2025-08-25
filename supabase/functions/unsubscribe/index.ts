@@ -2,8 +2,8 @@
 // Handles unsubscribe requests with HMAC token validation
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { getEnv } from '../_shared/env.js';
-import { errorResponse, successResponse, checkRateLimit, handleCors, validateUnsubscribeToken } from '../_shared/utils.js';
+import { getEnv } from '../_shared/env.ts';
+import { errorResponse, successResponse, checkRateLimit, handleCors, validateUnsubscribeToken } from '../_shared/utils.ts';
 
 interface UnsubscribeRequest {
   token: string;
