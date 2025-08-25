@@ -16,7 +16,10 @@ This doc explains how to run, deploy, and extend the system.
 
 - **Supabase (Edge Functions + DB)**  
   - Env vars:  
-    - SUPABASE_SERVICE_ROLE_KEY (server-only)  
+    - SB_URL (was SUPABASE_URL)  
+    - SB_SERVICE_ROLE_KEY (was SUPABASE_SERVICE_ROLE_KEY)  
+    - CIVIC_API_KEY (optional, for address enrichment)  
+    - UNSUB_SECRET (for HMAC validation)  
     - SENDGRID_WEBHOOK_SECRET (optional)  
 
 - **Make.com**  
@@ -36,7 +39,13 @@ This doc explains how to run, deploy, and extend the system.
 - `/app/admin/campaigns/page.tsx`: admin send trigger  
 
 ### Supabase Edge Functions
-- `/unsubscribe`: sets `subscriptions.unsubscribed_at`  
+
+**Now (Core Subscriber Management):**
+- `/profile-address`: updates user profiles and ensures subscriptions exist
+- `/subscriptions-toggle`: toggles subscription status deterministically  
+- `/unsubscribe`: handles unsubscribe with HMAC token validation
+
+**Later (Ops & Analytics):**
 - `/ingest-sendgrid`: maps events → `delivery_events`  
 - `/log-delivery`: logs campaign sends  
 

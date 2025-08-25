@@ -1,6 +1,6 @@
 # 🤖 LLM Code Review Checklist for Your Friend Fido (YFF)
 
-**Project:** [Your Friend Fido \- Civic Newsletter Platform](https://github.com/kevinjmireles/Fido-email-router)  
+**Project:** [Your Friend Fido \- Civic Newsletter Platform](https://github.com/kevinjmireles/yff-web)  
 **Commit:** `e22b14e` – “feat: complete YFF web signup interface with end-to-end testing”  
 **Stack:** Next.js, Supabase, Google Civic API, SendGrid  
 **Goal:** Help voters discover candidates and receive personalized civic newsletters based on their district.
