@@ -19,6 +19,11 @@ This platform collects user addresses, resolves them to Open Civic Data (OCD) id
 ### **Database Schema**
 - **[Consolidated SQL Patch](docs/V2_Requirements/yff-v2.1_sql_patch.sql)** - Complete database setup with RLS policies
 
+### **Schema Documentation**
+- **[Table Inventory](docs/functional/table_inventory.csv)** - Source of truth for database tables
+- **[Data Dictionary](docs/functional/data_dictionary.md)** - Complete field-level documentation
+- **[Excel Export](docs/exports/YFF_V2.1_Data_Dictionary.xlsx)** - Generated from CSV (run `npm run build:dict` to regenerate)
+
 ### **Legacy Documentation**
 - **[Deprecated V2 Docs](docs/deprecated/)** - Previous versions (archived)
 
