@@ -1,3 +1,5 @@
+> **Canonical schema docs (V2.1). Functional docs must reference this file.**
+
 # YFF V2.1 — Data Dictionary (Markdown)
 _Generated: 2025-08-24 21:41 UTC_
 
