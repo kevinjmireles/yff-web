@@ -16,7 +16,10 @@ This doc explains how to run, deploy, and extend the system.
 
 - **Supabase (Edge Functions + DB)**  
   - Env vars:  
-    - SUPABASE_SERVICE_ROLE_KEY (server-only)  
+    - SB_URL (was SUPABASE_URL)  
+    - SB_SERVICE_ROLE_KEY (was SUPABASE_SERVICE_ROLE_KEY)  
+    - CIVIC_API_KEY (optional, for address enrichment)  
+    - UNSUB_SECRET (for HMAC validation)  
     - SENDGRID_WEBHOOK_SECRET (optional)  
 
 - **Make.com**  
@@ -36,7 +39,13 @@ This doc explains how to run, deploy, and extend the system.
 - `/app/admin/campaigns/page.tsx`: admin send trigger  
 
 ### Supabase Edge Functions
-- `/unsubscribe`: sets `subscriptions.unsubscribed_at`  
+
+**Now (Core Subscriber Management):**
+- `/profile-address`: updates user profiles and ensures subscriptions exist
+- `/subscriptions-toggle`: toggles subscription status deterministically  
+- `/unsubscribe`: handles unsubscribe with HMAC token validation
+
+**Later (Ops & Analytics):**
 - `/ingest-sendgrid`: maps events → `delivery_events`  
 - `/log-delivery`: logs campaign sends  
 
@@ -79,3 +88,12 @@ This doc explains how to run, deploy, and extend the system.
 - Templating/preview in admin UI  
 - Multi-tenant customer support  
 - BI dashboards from Supabase  
+
+---
+
+## 8. References
+- **[V2.1 Signup & Enrichment](../V2_Requirements/yff-v2.1-01-signup.md)** - Complete signup flow specification
+- **[V2.1 Content Import](../V2_Requirements/yff-v2.1-02-content-import.md)** - CSV import and validation system
+- **[V2.1 Assembly & Send](../V2_Requirements/yff-v2.1-03-send.md)** - Newsletter assembly and delivery engine
+- **[V2.1 Overall Plan](../V2_Requirements/yff-v2.1-04-overall-plan.md)** - Complete architecture and implementation guide
+- **[V2.1 SQL Patch](../V2_Requirements/yff-v2.1_sql_patch.sql)** - Database schema and RLS policies

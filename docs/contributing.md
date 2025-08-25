@@ -133,3 +133,72 @@ Steps:
 - Keep commit messages clear and scoped to the milestone.  
 
 --
+Perfect 👍 — here’s a **ready-to-paste “Release Checklist”** for `/docs/CONTRIBUTING.md`.
+It’s short, covers everything, and makes sure you never wonder “did I forget something?” again.
+
+---
+
+````md
+## Milestone Release Checklist
+
+Before tagging a new milestone, follow this checklist:
+
+1. **Database migrations**
+   - ✅ All schema changes are in `/supabase/migrations/`
+   - ✅ Ran in Supabase and verified (`select ...` confirms columns, constraints, indexes, RLS)
+
+2. **Documentation**
+   - ✅ `/docs/functional/data_dictionary.md` updated (with new/removed columns, indexes, RLS status)
+   - ✅ `/docs/functional/table_inventory.csv` updated if tables added/removed
+   - ✅ “Last updated” date bumped in docs
+
+3. **Code & Config**
+   - ✅ Edge functions updated if schema changes affect them
+   - ✅ Environment variables checked (no placeholders left)
+
+4. **Git Commit**
+   - ✅ Stage all changes (`git add .`)
+   - ✅ Commit with clear message: `"db+docs: <milestone summary>"`
+
+5. **Git Tag**
+   - ✅ Create annotated tag with semantic version + scope:
+     ```
+     git tag -a vX.Y.Z-scope -m "Tag message"
+     ```
+   - ✅ Push commit and tag:
+     ```
+     git push
+     git push --tags
+     ```
+
+6. **Verification**
+   - ✅ Run `git log --oneline -5` and confirm the commit + tag appear
+   - ✅ Confirm GitHub repo shows the tag under *Releases → Tags*
+
+---
+
+### Example: releasing `v0.2.0-make-import`
+
+- Migration: `/supabase/migrations/20250828_add_audience_members.sql`
+- Docs: updated `data_dictionary.md` + `table_inventory.csv`
+- Commit message:
+````
+
+db+docs: milestone v0.2.0 (Make.com CSV import → audience\_members)
+
+```
+- Tag:
+```
+
+git tag -a v0.2.0-make-import -m "CSV import into audience\_members; dedupe with (email,campaign\_tag)"
+git push && git push --tags
+
+```
+
+---
+```
+
+---
+
+✅ With this, you’ll always have the same muscle memory: check DB → update docs → commit → tag → push.
+

@@ -1,4 +1,3 @@
-# Canonical schema docs (V2.1). Functional docs must reference this file.
 table,purpose,primary_key,unique_indexes,rls_posture,notes
 profiles,Subscriber identity + address → OCD IDs,user_id,email (unique),Owner-only (RLS),Client read optional; writes via server (recommended)
 subscriptions,List membership (toggle unsubscribed_at),id,"(user_id, list_key) unique",Owner read optional; writes via server,HMAC unsubscribe; Edge function toggles unsubscribed_at

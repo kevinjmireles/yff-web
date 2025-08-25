@@ -19,6 +19,17 @@ Welcome to the Your Friend Fido documentation. Everything you need to build, run
 - [Product Requirements Document (PRD)](./functional/prd.md)
 - [Handoff Notes](./functional/handoff.md)
 
+## 🗄️ Schema Docs (V2.1)
+- **Canonical**: [Data Dictionary](./functional/data_dictionary.md)
+- **Inventory**: [Table Inventory](./functional/table_inventory.csv)
+- **Excel export (generated)**: [YFF_V2.1_Data_Dictionary.xlsx](./exports/YFF_V2.1_Data_Dictionary.xlsx)
+
+### Regenerate Excel
+```bash
+npm install
+npm run build:dict
+```
+
 ## 🧪 Test Data
 - [Sample CSVs](./test-data/sample_csvs.md) _(future)_
 - [Test Scenarios](./test-data/test_scenarios.md) _(future)_
