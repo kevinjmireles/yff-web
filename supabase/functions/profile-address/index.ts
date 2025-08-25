@@ -2,8 +2,8 @@
 // Updates user profile with address and ensures subscription exists
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { getEnv } from '../_shared/env.js';
-import { errorResponse, successResponse, checkRateLimit, handleCors } from '../_shared/utils.js';
+import { getEnv } from '../_shared/env.ts';
+import { errorResponse, successResponse, checkRateLimit, handleCors } from '../_shared/utils.ts';
 
 interface ProfileAddressRequest {
   email: string;
