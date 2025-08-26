@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "build:dict": "node scripts/build-data-dictionary.js"
+    "build:dict": "node scripts/build-data-dictionary.js",
+    "smoke:edge": "node scripts/smoke-edge.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

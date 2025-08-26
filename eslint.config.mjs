@@ -18,7 +18,21 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "supabase/**",
     ],
+  },
+  {
+    files: ["src/**/*.{ts,tsx,js,jsx}"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        "patterns": [
+          {
+            "group": ["supabase/*", "../supabase/*", "../../supabase/*"],
+            "message": "Do not import Supabase Edge code into the Next.js app"
+          }
+        ]
+      }]
+    }
   },
 ];
 
