@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 // Purpose: Terms of Service page for legal compliance.
 // Called by: Footer component and direct navigation.
 // Note: MVP version with essential terms and liability protection.

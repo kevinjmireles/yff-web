@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 // Purpose: Privacy Policy page for legal compliance.
 // Called by: Footer component and direct navigation.
 // Note: MVP version with essential privacy information.
