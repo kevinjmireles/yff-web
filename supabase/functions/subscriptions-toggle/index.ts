@@ -3,7 +3,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getEnv } from '../_shared/env.ts';
-import { errorResponse, successResponse, checkRateLimit, handleCors } from '../_shared/utils.ts';
+import { errorResponse, successResponse, checkRateLimit, handleCors, requireSharedSecret } from '../_shared/utils.ts';
 
 interface SubscriptionToggleRequest {
   email: string;
@@ -17,7 +17,14 @@ interface SubscriptionToggleResponse {
 
 Deno.serve(async (request: Request) => {
   try {
-    const env = getEnv();
+    // Handle OPTIONS preflight
+    if (request.method === "OPTIONS") return new Response(null, { status: 204 });
+    
+    const env = getEnv(); // throws if misconfigured
+    
+    // Authentication check
+    const unauth = requireSharedSecret(request, env.EDGE_SHARED_SECRET);
+    if (unauth) return unauth;
     
     // CORS check
     const corsResponse = handleCors(request, env.CORS_ORIGINS);

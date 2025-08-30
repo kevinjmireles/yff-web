@@ -140,3 +140,15 @@ export async function generateUnsubscribeToken(email: string, list_key: string, 
   
   return `${payloadB64}.${hmacB64}`;
 }
+
+// Authentication helper for Edge Functions
+export function requireSharedSecret(req: Request, secret: string) {
+  const header = req.headers.get("x-edge-secret");
+  if (!header || header !== secret) {
+    return new Response(
+      JSON.stringify({ ok: false, code: "UNAUTHORIZED", message: "Missing or invalid authorization header" }),
+      { status: 401, headers: { "content-type": "application/json" } }
+    );
+  }
+  return null;
+}
