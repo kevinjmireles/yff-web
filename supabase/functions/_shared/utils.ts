@@ -143,12 +143,24 @@ export async function generateUnsubscribeToken(email: string, list_key: string, 
 
 // Authentication helper for Edge Functions
 export function requireSharedSecret(req: Request, secret: string) {
-  const header = req.headers.get("x-edge-secret");
-  if (!header || header !== secret) {
+  const hdr = (req.headers.get("x-edge-secret") || "").trim();
+  const env = (secret || "").trim();
+  
+  if (!hdr || !env || hdr !== env) {
     return new Response(
       JSON.stringify({ ok: false, code: "UNAUTHORIZED", message: "Missing or invalid authorization header" }),
       { status: 401, headers: { "content-type": "application/json" } }
     );
   }
+  
+  // Optional debug logging (no secret values exposed)
+  if (Deno.env.get("DEBUG_EDGE_AUTH") === "1") {
+    console.log({
+      hasHeader: !!hdr,
+      headerLen: hdr.length,
+      secretLen: env.length
+    });
+  }
+  
   return null;
 }
