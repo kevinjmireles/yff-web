@@ -23,8 +23,8 @@ Deno.serve(async (request: Request) => {
     const env = getEnv(); // throws if misconfigured
     
     // Authentication check
-    const unauth = requireSharedSecret(request, env.EDGE_SHARED_SECRET);
-    if (unauth) return unauth;
+    const auth = requireSharedSecret(request, env.EDGE_SHARED_SECRET);
+    if (!auth.ok) return auth.response;
     
     // CORS check
     const corsResponse = handleCors(request, env.CORS_ORIGINS);
