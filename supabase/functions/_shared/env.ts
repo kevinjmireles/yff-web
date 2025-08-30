@@ -9,7 +9,7 @@ export function getEnv() {
   const CORS_ORIGINS = Deno.env.get("CORS_ORIGINS") || "";
   
   if (!SB_URL || !SERVICE_ROLE) throw new Error("Missing SB_URL or SB_SERVICE_ROLE_KEY");
-  if (!EDGE_SHARED_SECRET) throw new Error("EDGE_SHARED_SECRET missing");
+  if (!EDGE_SHARED_SECRET.trim()) throw new Error("EDGE_SHARED_SECRET missing");
   
   return { SUPABASE_URL: SB_URL, SERVICE_ROLE, CIVIC_API_KEY, UNSUB_SECRET, EDGE_SHARED_SECRET, CORS_ORIGINS };
 }
