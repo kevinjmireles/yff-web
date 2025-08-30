@@ -83,6 +83,22 @@ export function handleCors(request: Request, corsOrigins: string): Response | nu
   return null; // Continue processing
 }
 
+// Enhanced CORS handling for Edge Functions
+export function handleCors(req: Request) {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET,POST,OPTIONS',
+        'access-control-allow-headers': 'authorization, x-edge-secret, x-client-info, apikey',
+        'access-control-max-age': '86400',
+      },
+    });
+  }
+  return null;
+}
+
 // HMAC validation for unsubscribe tokens - CORRECTED implementation
 export async function validateUnsubscribeToken(token: string, secret: string): Promise<{ email: string; list_key: string }> {
   try {
@@ -141,26 +157,82 @@ export async function generateUnsubscribeToken(email: string, list_key: string, 
   return `${payloadB64}.${hmacB64}`;
 }
 
-// Authentication helper for Edge Functions
-export function requireSharedSecret(req: Request, secret: string) {
-  const hdr = (req.headers.get("x-edge-secret") || "").trim();
-  const env = (secret || "").trim();
-  
-  if (!hdr || !env || hdr !== env) {
-    return new Response(
-      JSON.stringify({ ok: false, code: "UNAUTHORIZED", message: "Missing or invalid authorization header" }),
-      { status: 401, headers: { "content-type": "application/json" } }
-    );
+// Helper functions for authentication
+function safeJsonHeaders() {
+  return {
+    'content-type': 'application/json',
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': 'authorization, x-edge-secret, x-client-info, apikey',
+  };
+}
+
+function normalizeAuthHeaderValue(raw: string): string {
+  let v = (raw || '').trim();
+
+  // Remove Bearer prefix if present (case-insensitive)
+  if (v.toLowerCase().startsWith('bearer ')) {
+    v = v.slice(7);
   }
-  
-  // Optional debug logging (no secret values exposed)
-  if (Deno.env.get("DEBUG_EDGE_AUTH") === "1") {
+
+  v = v.trim();
+
+  // Strip outermost quotes (ASCII & curly)
+  const first = v.charAt(0);
+  const last = v.charAt(v.length - 1);
+  const quotes = new Set(['"', "'", '"', '"', ''', ''', '`']);
+  if (v.length >= 2 && quotes.has(first) && quotes.has(last)) {
+    v = v.slice(1, -1).trim();
+  }
+
+  // Strip zero-width characters just in case
+  v = v.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
+  return v;
+}
+
+// Enhanced authentication helper for Edge Functions
+export function requireSharedSecret(req: Request, secretEnv: string) {
+  // Try common header spellings
+  const candidate =
+    req.headers.get('x-edge-secret') ??
+    req.headers.get('X-Edge-Secret') ??
+    req.headers.get('authorization') ??
+    req.headers.get('Authorization') ??
+    '';
+
+  const hadHeader = !!candidate;
+  const headerToken = normalizeAuthHeaderValue(candidate);
+  const envSecret = (secretEnv || '').trim();
+
+  // Optional safe debug (no secret values printed)
+  if (Deno.env.get('DEBUG_EDGE_AUTH') === '1') {
     console.log({
-      hasHeader: !!hdr,
-      headerLen: hdr.length,
-      secretLen: env.length
+      hasHeader: hadHeader,
+      headerLen: headerToken.length,
+      secretLen: envSecret.length,
     });
   }
-  
-  return null;
+
+  if (!hadHeader) {
+    return {
+      ok: false as const,
+      response: new Response(
+        JSON.stringify({ code: 401, message: 'Missing authorization header' }),
+        { status: 401, headers: safeJsonHeaders() }
+      ),
+    };
+  }
+
+  // You can keep 401 here (no info leak); 403 is also defensible.
+  if (!envSecret || headerToken !== envSecret) {
+    return {
+      ok: false as const,
+      response: new Response(
+        JSON.stringify({ code: 401, message: 'Invalid authorization header' }),
+        { status: 401, headers: safeJsonHeaders() }
+      ),
+    };
+  }
+
+  return { ok: true as const };
 }
