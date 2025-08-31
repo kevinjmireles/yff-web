@@ -3,6 +3,9 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// Supported quote characters: ASCII double + single, backtick, and curly pairs
+const QUOTE_CHARS = new Set(['"', "'", '\u201C', '\u201D', '\u2018', '\u2019', '`']);
+
 export interface ErrorResponse {
   ok: false;
   code: string;
@@ -166,6 +169,23 @@ function safeJsonHeaders() {
   };
 }
 
+function stripSurroundingQuotes(s: string) {
+  if (s.length < 2) return s;
+  const first = s[0];
+  const last = s[s.length - 1];
+  if (!QUOTE_CHARS.has(first) || !QUOTE_CHARS.has(last)) return s;
+
+  // Only strip when they form a proper pair or are identical
+  if (
+    first === last ||
+    (first === '\u201C' && last === '\u201D') || // " … "
+    (first === '\u2018' && last === '\u2019')    // ' … '
+  ) {
+    return s.slice(1, -1);
+  }
+  return s;
+}
+
 function normalizeAuthHeaderValue(raw: string): string {
   let v = (raw || '').trim();
 
@@ -176,13 +196,8 @@ function normalizeAuthHeaderValue(raw: string): string {
 
   v = v.trim();
 
-  // Strip outermost quotes (ASCII & curly)
-  const first = v.charAt(0);
-  const last = v.charAt(v.length - 1);
-  const quotes = new Set(['"', "'", '"', '"', ''', ''', '`']);
-  if (v.length >= 2 && quotes.has(first) && quotes.has(last)) {
-    v = v.slice(1, -1).trim();
-  }
+  // Strip outermost quotes using the safe helper
+  v = stripSurroundingQuotes(v);
 
   // Strip zero-width characters just in case
   v = v.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
