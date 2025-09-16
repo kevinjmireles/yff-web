@@ -71,7 +71,7 @@ export async function checkRateLimit(ip: string, endpoint: string, maxAttempts: 
   }
 }
 
-// Overload signatures
+// CORS handling for Edge Functions
 export function handleCors(req: Request): Response | null;
 export function handleCors(req: Request, corsOrigins: string): Response | null;
 
@@ -93,10 +93,10 @@ export function handleCors(req: Request, corsOrigins?: string): Response | null 
 
   // Restrict origin if list provided
   if (corsOrigins) {
-    const origin = req.headers.get('origin');
+    const origin = req.headers.get('origin')?.toLowerCase();
     const allowed = corsOrigins
       .split(',')
-      .map(o => o.trim())
+      .map(o => o.trim().toLowerCase())
       .filter(Boolean);
 
     if (origin && allowed.length > 0 && !allowed.includes(origin)) {
@@ -178,7 +178,6 @@ function safeJsonHeaders() {
   };
 }
 
-<<<<<<< HEAD
 function stripSurroundingQuotes(s: string) {
   if (s.length < 2) return s;
   const first = s[0];
@@ -208,25 +207,6 @@ function normalizeAuthHeaderValue(raw: string): string {
 
   // Strip outermost quotes using the safe helper
   v = stripSurroundingQuotes(v);
-=======
-function normalizeAuthHeaderValue(raw: string): string {
-  let v = (raw || '').trim();
-
-  // Remove Bearer prefix if present (case-insensitive)
-  if (v.toLowerCase().startsWith('bearer ')) {
-    v = v.slice(7);
-  }
-
-  v = v.trim();
-
-  // Strip outermost quotes (ASCII & curly)
-  const first = v.charAt(0);
-  const last = v.charAt(v.length - 1);
-  const quotes = new Set(['"', "'", '"', '"', ''', ''', '`']);
-  if (v.length >= 2 && quotes.has(first) && quotes.has(last)) {
-    v = v.slice(1, -1).trim();
-  }
->>>>>>> origin/main
 
   // Strip zero-width characters just in case
   v = v.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();

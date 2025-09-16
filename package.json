@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:watch": "vitest",
     "build:dict": "node scripts/build-data-dictionary.js",
     "smoke:edge": "node scripts/smoke-edge.mjs",
     "edge:verify": "node scripts/edge-verify.mjs"

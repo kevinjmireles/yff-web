@@ -1,7 +1,58 @@
+# ChatGPT Implementation Guide - Enhanced Signup Flow
+
+**Purpose:** This document provides ChatGPT with the correct implementation details for enhancing the YFF signup flow with database writes.
+
+---
+
+## **🎯 CURRENT STATE SUMMARY**
+
+### **Existing Implementation**
+- **Signup Form**: `src/app/page.tsx` - collects name, email, address (full address)
+- **API Route**: `src/app/api/signup/route.ts` - handles reCAPTCHA validation
+- **Database**: Model B (auth-keyed) with FK constraints
+- **Edge Functions**: profile-address, subscriptions-toggle, unsubscribe (ACTIVE)
+- **Civic API**: Address → OCD ID mapping already implemented
+
+### **Goal**
+- Enhance current signup to write to database
+- Keep existing functionality (reCAPTCHA validation)
+- Maintain address → OCD ID mapping via Edge Functions
+- Add subscription creation when user_id exists
+
+---
+
+## **🔧 CORRECTED IMPLEMENTATION**
+
+### **1. Server-Side Admin Client**
+
+**File:** `src/lib/supabaseAdmin.ts`
+```typescript
+// Purpose: Server-side Supabase admin client for bypassing RLS
+// Called by: API routes that need to write to database without user authentication
+// Note: This client uses service role key and bypasses RLS policies
+
+import { createClient } from '@supabase/supabase-js';
+
+const url = process.env.SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!url || !serviceKey) {
+  throw new Error(
+    'Server-side Supabase env not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel Project Settings'
+  );
+}
+
+export const supabaseAdmin = createClient(url, serviceKey, {
+  auth: { persistSession: false },
+});
+```
+
+### **2. Enhanced API Route**
+
+**File:** `src/app/api/signup/route.ts`
+```typescript
 /**
- * file: app/api/signup/route.ts
- * purpose: Enhanced signup with database writes, Civic API enrichment, and reCAPTCHA validation
- * calledBy: app/page.tsx -> SignupForm
+ * Enhanced signup with database writes, Civic API enrichment, and reCAPTCHA validation
  * 
  * Flow:
  * 1. Validate input and reCAPTCHA
@@ -109,7 +160,7 @@ export async function POST(req: NextRequest) {
         const { data, error } = await supabaseAdmin.functions.invoke('profile-address', {
           body: { email, address },
           headers: { 'x-edge-secret': edgeSecret },
-          signal: controller.signal  // FIXED: Add abort signal
+          signal: controller.signal  // CRITICAL: Add abort signal
         });
         
         clearTimeout(timeoutId);
@@ -189,3 +240,149 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Signup failed. Please try again.' }, { status: 500 });
   }
 }
+```
+
+---
+
+## **🔑 CRITICAL IMPLEMENTATION DETAILS**
+
+### **1. Edge Function Authentication**
+**CRITICAL:** The `profile-address` Edge Function requires authentication:
+```typescript
+// Must include this header:
+headers: {
+  'x-edge-secret': process.env.EDGE_SHARED_SECRET!
+}
+```
+
+### **2. Edge Function Timeout Protection**
+**CRITICAL:** Always include timeout protection to prevent hanging requests:
+```typescript
+// Add timeout to prevent hanging requests
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+const { data, error } = await supabaseAdmin.functions.invoke('profile-address', {
+  body: { email, address },
+  headers: { 'x-edge-secret': edgeSecret },
+  signal: controller.signal  // CRITICAL: Add abort signal
+});
+
+clearTimeout(timeoutId);
+```
+
+### **3. Edge Function Response Format**
+**CRITICAL:** The Edge Function returns wrapped response:
+```typescript
+// Correct parsing:
+if (!error && data?.data?.ocd_ids?.length) {
+  ocdIds = data.data.ocd_ids;
+}
+// NOT: data.ocd_ids (this will be undefined)
+```
+
+### **4. Environment Variables Required**
+**Vercel Project Settings:**
+- `SUPABASE_URL` (server-side)
+- `SUPABASE_SERVICE_ROLE_KEY` (server-side)
+- `EDGE_SHARED_SECRET` (for Edge Function auth)
+- `RECAPTCHA_SECRET_KEY` (for reCAPTCHA validation)
+
+### **5. Database Constraints**
+- `subscriptions.user_id → profiles.user_id` (FK constraint)
+- `UNIQUE (user_id, list_key)` (prevents duplicate subscriptions)
+- Only create subscriptions when `profiles.user_id` exists
+
+---
+
+## **📋 ACCEPTANCE CRITERIA**
+
+### **✅ Functionality**
+- Form submits exactly as before; no UI change
+- `/api/signup` returns `{ success: true, data: { districtsFound } }`
+- If `profiles.user_id` exists for that email:
+  - `profiles.address` and `profiles.zipcode` are updated
+  - `subscriptions` upserts a `general` row (unique on `user_id,list_key`)
+- No calls to Make.com anywhere in the route
+
+### **✅ Error Handling**
+- reCAPTCHA validation works (if configured)
+- Edge Function failures don't break signup
+- Database errors are properly handled
+- Rate limiting is preserved
+
+### **✅ Data Flow**
+1. User submits form → API route
+2. API validates input + reCAPTCHA
+3. API calls Edge Function for address enrichment
+4. API writes to database (if user_id exists)
+5. API returns success with district count
+
+---
+
+## **🚨 COMMON PITFALLS TO AVOID**
+
+### **1. Missing Authentication**
+```typescript
+// WRONG - will return 401:
+const { data, error } = await supabaseAdmin.functions.invoke('profile-address', {
+  body: { email, address }
+});
+
+// CORRECT - includes auth header:
+const { data, error } = await supabaseAdmin.functions.invoke('profile-address', {
+  body: { email, address },
+  headers: { 'x-edge-secret': process.env.EDGE_SHARED_SECRET! }
+});
+```
+
+### **2. Missing Timeout Protection**
+```typescript
+// WRONG - can hang indefinitely:
+const { data, error } = await supabaseAdmin.functions.invoke('profile-address', {
+  body: { email, address },
+  headers: { 'x-edge-secret': edgeSecret }
+});
+
+// CORRECT - with timeout protection:
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), 10000);
+const { data, error } = await supabaseAdmin.functions.invoke('profile-address', {
+  body: { email, address },
+  headers: { 'x-edge-secret': edgeSecret },
+  signal: controller.signal  // CRITICAL: Add abort signal
+});
+clearTimeout(timeoutId);
+```
+
+### **3. Wrong Response Parsing**
+```typescript
+// WRONG - will be undefined:
+if (data?.ocd_ids?.length) { ... }
+
+// CORRECT - wrapped response:
+if (data?.data?.ocd_ids?.length) { ... }
+```
+
+### **4. Missing Environment Variables**
+```typescript
+// WRONG - will throw error:
+const url = process.env.SUPABASE_URL!;
+
+// CORRECT - with validation:
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error('Server configuration error');
+}
+```
+
+---
+
+## **🎯 NEXT STEPS**
+
+1. **Set Environment Variables** in Vercel Project Settings
+2. **Deploy the enhanced API route**
+3. **Test signup flow** with and without user_id
+4. **Verify database writes** are working correctly
+5. **Test Edge Function integration** with proper authentication
+
+**This implementation preserves all existing functionality while adding the requested database writes!**
