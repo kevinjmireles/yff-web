@@ -71,34 +71,43 @@ export async function checkRateLimit(ip: string, endpoint: string, maxAttempts: 
   }
 }
 
-// CORS handling
-export function handleCors(request: Request, corsOrigins: string): Response | null {
-  const origin = request.headers.get('origin');
-  const allowedOrigins = corsOrigins.split(',').map(o => o.trim()).filter(Boolean);
-  
-  if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
-    return new Response(JSON.stringify(errorResponse('CORS_ERROR', 'Origin not allowed')), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-  
-  return null; // Continue processing
-}
+// Overload signatures
+export function handleCors(req: Request): Response | null;
+export function handleCors(req: Request, corsOrigins: string): Response | null;
 
-// Enhanced CORS handling for Edge Functions
-export function handleCors(req: Request) {
+// Single implementation
+export function handleCors(req: Request, corsOrigins?: string): Response | null {
+  // Handle OPTIONS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
       headers: {
         'access-control-allow-origin': '*',
         'access-control-allow-methods': 'GET,POST,OPTIONS',
-        'access-control-allow-headers': 'authorization, x-edge-secret, x-client-info, apikey',
+        'access-control-allow-headers': 'authorization, x-edge-secret, x-client-info, apikey, content-type',
         'access-control-max-age': '86400',
+        'vary': 'origin',
       },
     });
   }
+
+  // Restrict origin if list provided
+  if (corsOrigins) {
+    const origin = req.headers.get('origin');
+    const allowed = corsOrigins
+      .split(',')
+      .map(o => o.trim())
+      .filter(Boolean);
+
+    if (origin && allowed.length > 0 && !allowed.includes(origin)) {
+      return new Response(
+        JSON.stringify({ code: 'CORS_ERROR', message: 'Origin not allowed' }),
+        { status: 403, headers: { 'content-type': 'application/json' } }
+      );
+    }
+  }
+
+  // Continue processing
   return null;
 }
 
