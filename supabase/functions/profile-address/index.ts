@@ -71,33 +71,72 @@ Deno.serve(async (request: Request) => {
     // Initialize Supabase client
     const supabase = createClient(env.SUPABASE_URL, env.SERVICE_ROLE);
     
-    // Call Google Civic API to get OCD IDs - CORRECTED implementation
+    // Call Google Civic API to get OCD IDs - HARDENED implementation
     let ocdIds: string[] = [];
     let zipcode = '';
     
     try {
       if (env.CIVIC_API_KEY) {
-        const civicResponse = await fetch(
-          `https://www.googleapis.com/civicinfo/v2/divisionsByAddress?address=${encodeURIComponent(body.address)}&key=${env.CIVIC_API_KEY}`
-        );
+        // Sanitize address input
+        const sanitizedAddress = String(body.address || "")
+          .replace(/^\s*address[:\s]*/i, "") // drop "Address" prefix if present
+          .replace(/\s+/g, " ")
+          .trim();
         
-        if (civicResponse.ok) {
-          const civicData = await civicResponse.json();
-          
-          // CORRECT data extraction from divisionsByAddress
-          if (civicData.divisions) {
-            ocdIds = Object.keys(civicData.divisions);
-          }
-          
-          // CORRECT zipcode extraction
-          if (civicData.normalizedInput?.zip) {
-            zipcode = civicData.normalizedInput.zip;
-          }
+        if (!sanitizedAddress) {
+          console.error('Address sanitization resulted in empty string');
+          return new Response(JSON.stringify(errorResponse('INVALID_REQUEST', 'Address cannot be empty')), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
+        
+        // Use Google Civic v2 divisionsByAddress endpoint with timeout
+        const url = new URL("https://civicinfo.googleapis.com/civicinfo/v2/divisionsByAddress");
+        url.searchParams.set("address", sanitizedAddress);
+        url.searchParams.set("key", env.CIVIC_API_KEY);
+        
+        // Fetch with timeout protection
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000); // 7 second timeout
+        
+        const civicResponse = await fetch(url.toString(), {
+          headers: { accept: "application/json" },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!civicResponse.ok) {
+          const text = await civicResponse.text().catch(() => "");
+          console.error('Civic API error:', civicResponse.status, text);
+          return new Response(JSON.stringify(errorResponse('CIVIC_API_ERROR', `Civic API error: ${civicResponse.status}`)), {
+            status: 502,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const civicData = await civicResponse.json();
+        
+        // Extract OCD IDs from divisions with proper validation
+        if (!civicData?.divisions || civicData.divisions.length === 0) {
+          console.warn('No divisions found for address:', sanitizedAddress);
+          ocdIds = [];
+        } else {
+          ocdIds = civicData.divisions.map((div: any) => div.ocdId);
+        }
+        
+        // Extract zipcode from normalized input or fallback to address parsing
+        zipcode = civicData?.normalizedInput?.zip ?? 
+                 (sanitizedAddress.match(/\b\d{5}(?:-\d{4})?\b/)?.[0]?.slice(0, 5) ?? '');
+        
+        console.log(`Civic API success: found ${ocdIds.length} OCD IDs, zipcode: ${zipcode}`);
+      } else {
+        console.warn('CIVIC_API_KEY not configured, skipping Civic API enrichment');
       }
     } catch (civicError) {
-      console.error('Civic API error:', civicError);
-      // Continue without Civic data
+      console.error('Civic API exception:', civicError);
+      // Continue without Civic data - don't fail the entire request
     }
     
     // CORRECT profile upsert with V2.1 schema fields
@@ -105,7 +144,7 @@ Deno.serve(async (request: Request) => {
       .from('profiles')
       .upsert({
         email: body.email,
-        address: body.address,
+        address: sanitizedAddress,
         zipcode,
         ocd_ids: ocdIds,
         ocd_last_verified_at: new Date().toISOString(),
