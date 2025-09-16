@@ -57,6 +57,14 @@ function zipFromAddress(address: string): string | null {
   return m?.[0]?.slice(0, 5) ?? null;
 }
 
+async function invokeWithTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Edge Function timeout')), timeoutMs);
+  });
+  
+  return Promise.race([fn(), timeoutPromise]);
+}
+
 export async function POST(req: NextRequest) {
   try {
     // 0) Rate limit: 5 req/min per IP
@@ -102,22 +110,22 @@ export async function POST(req: NextRequest) {
 
     if (edgeSecret) {
       try {
-        // Add timeout to prevent hanging requests
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const result = await invokeWithTimeout(async () => {
+          return await supabaseAdmin.functions.invoke('profile-address', {
+            body: { email, address },
+            headers: { 'x-edge-secret': edgeSecret }
+          });
+        }, 10000); // 10 second timeout
         
-        const { data, error } = await supabaseAdmin.functions.invoke('profile-address', {
-          body: { email, address },
-          headers: { 'x-edge-secret': edgeSecret },
-          signal: controller.signal  // FIXED: Add abort signal
-        });
-        
-        clearTimeout(timeoutId);
-        
+        const { data, error } = result;
         if (!error && data?.data?.ocd_ids?.length) ocdIds = data.data.ocd_ids;
         if (!error && data?.data?.zipcode) zipcode = data.data.zipcode;
       } catch (err) {
-        console.error('profile-address invoke failed:', err);
+        if (err instanceof Error && err.message === 'Edge Function timeout') {
+          console.error('Edge Function timed out after 10 seconds');
+        } else {
+          console.error('profile-address invoke failed:', err);
+        }
         // Continue without enrichment
       }
     } else {

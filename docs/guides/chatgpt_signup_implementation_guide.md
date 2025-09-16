@@ -256,19 +256,35 @@ headers: {
 ```
 
 ### **2. Edge Function Timeout Protection**
-**CRITICAL:** Always include timeout protection to prevent hanging requests:
+**CRITICAL:** Always implement timeout protection using Promise.race to prevent hanging requests:
 ```typescript
-// Add timeout to prevent hanging requests
-const controller = new AbortController();
-const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+async function invokeWithTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Edge Function timeout')), timeoutMs);
+  });
+  
+  return Promise.race([fn(), timeoutPromise]);
+}
 
-const { data, error } = await supabaseAdmin.functions.invoke('profile-address', {
-  body: { email, address },
-  headers: { 'x-edge-secret': edgeSecret },
-  signal: controller.signal  // CRITICAL: Add abort signal
-});
-
-clearTimeout(timeoutId);
+// Usage with timeout:
+try {
+  const result = await invokeWithTimeout(async () => {
+    return await supabaseAdmin.functions.invoke('profile-address', {
+      body: { email, address },
+      headers: { 'x-edge-secret': edgeSecret }
+    });
+  }, 10000); // 10 second timeout
+  
+  const { data, error } = result;
+  if (!error && data?.data?.ocd_ids?.length) ocdIds = data.data.ocd_ids;
+} catch (err) {
+  if (err.message === 'Edge Function timeout') {
+    console.error('Edge Function timed out after 10 seconds');
+  } else {
+    console.error('profile-address invoke failed:', err);
+  }
+  // Continue without enrichment
+}
 ```
 
 ### **3. Edge Function Response Format**
@@ -345,14 +361,12 @@ const { data, error } = await supabaseAdmin.functions.invoke('profile-address', 
 });
 
 // CORRECT - with timeout protection:
-const controller = new AbortController();
-const timeoutId = setTimeout(() => controller.abort(), 10000);
-const { data, error } = await supabaseAdmin.functions.invoke('profile-address', {
-  body: { email, address },
-  headers: { 'x-edge-secret': edgeSecret },
-  signal: controller.signal  // CRITICAL: Add abort signal
-});
-clearTimeout(timeoutId);
+const result = await invokeWithTimeout(async () => {
+  return await supabaseAdmin.functions.invoke('profile-address', {
+    body: { email, address },
+    headers: { 'x-edge-secret': edgeSecret }
+  });
+}, 10000); // 10 second timeout
 ```
 
 ### **3. Wrong Response Parsing**
