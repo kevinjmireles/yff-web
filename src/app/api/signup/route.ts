@@ -132,54 +132,46 @@ export async function POST(req: NextRequest) {
       console.warn('EDGE_SHARED_SECRET missing; skipping profile-address enrichment in non-prod');
     }
 
-    // 4) DB writes (Model B): only if profiles.user_id exists for this email
-    const { data: prof, error: profErr } = await supabaseAdmin
+    // 4) Create or update profile by email, then attach subscription
+    const nowIso = new Date().toISOString();
+    const { data: profRow, error: profUpErr } = await supabaseAdmin
       .from('profiles')
-      .select('user_id')
-      .eq('email', email)
-      .maybeSingle();
-    
-    if (profErr) {
-      console.error('profiles lookup failed:', profErr);
-      return NextResponse.json({ success: false, error: 'Database error' }, { status: 500 });
-    }
-
-    if (prof?.user_id) {
-      // Update profile with address data
-      const { error: updErr } = await supabaseAdmin
-        .from('profiles')
-        .update({
+      .upsert(
+        {
+          email,
           address,
           zipcode,
           ocd_ids: ocdIds,
-          ocd_last_verified_at: new Date().toISOString(),
-        })
-        .eq('user_id', prof.user_id);
-      
-      if (updErr) {
-        console.error('profiles update failed:', updErr);
-        return NextResponse.json({ success: false, error: 'Database error' }, { status: 500 });
-      }
+          ocd_last_verified_at: nowIso,
+          created_at: nowIso,          // harmless if DB already defaults this
+        },
+        { onConflict: 'email' }
+      )
+      .select('user_id')
+      .single();
 
-      // Create default subscription
-      const { error: subErr } = await supabaseAdmin
-        .from('subscriptions')
-        .upsert(
-          { 
-            user_id: prof.user_id, 
-            list_key: 'general', 
-            unsubscribed_at: null,
-            created_at: new Date().toISOString()
-          },
-          { onConflict: 'user_id,list_key' }
-        );
-      
-      if (subErr) {
-        console.error('subscriptions upsert failed:', subErr);
-        return NextResponse.json({ success: false, error: 'Database error' }, { status: 500 });
-      }
+    if (profUpErr || !profRow?.user_id) {
+      console.error('profiles upsert failed or missing user_id:', profUpErr);
+      return NextResponse.json({ success: false, error: 'Database error' }, { status: 500 });
     }
-    // If no user_id yet, we skip subscription due to FK. Can attach later on first auth.
+
+    // Ensure default subscription (idempotent)
+    const { error: subErr } = await supabaseAdmin
+      .from('subscriptions')
+      .upsert(
+        {
+          user_id: profRow.user_id,
+          list_key: 'general',
+          unsubscribed_at: null,
+          created_at: nowIso,          // optional if DB has DEFAULT now()
+        },
+        { onConflict: 'user_id,list_key' }
+      );
+
+    if (subErr) {
+      console.error('subscriptions upsert failed:', subErr);
+      return NextResponse.json({ success: false, error: 'Database error' }, { status: 500 });
+    }
 
     // 5) Response
     return NextResponse.json({
@@ -189,7 +181,7 @@ export async function POST(req: NextRequest) {
         districtsFound: ocdIds.length,
         email,
         zipcode,
-        hasSubscription: !!prof?.user_id,
+        hasSubscription: true,  // Always true now since we always create subscription
       },
     });
   } catch (error) {
