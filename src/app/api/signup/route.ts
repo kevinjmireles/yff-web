@@ -57,13 +57,6 @@ function zipFromAddress(address: string): string | null {
   return m?.[0]?.slice(0, 5) ?? null;
 }
 
-async function invokeWithTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<T> {
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Edge Function timeout')), timeoutMs);
-  });
-  
-  return Promise.race([fn(), timeoutPromise]);
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -95,41 +88,53 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'reCAPTCHA verification failed' }, { status: 400 });
     }
 
-    // 3) Enrichment via Edge Function (fail-closed prod, skip in dev)
+    // 3) Enrichment via Google Civic API directly (non-blocking if it fails)
     let ocdIds: string[] = [];
     let zipcode = zipFromAddress(address);
 
-    const edgeSecret = process.env.EDGE_SHARED_SECRET;
-    if (process.env.NODE_ENV === 'production' && !edgeSecret) {
-      console.error('Server configuration error: EDGE_SHARED_SECRET required in production');
-      return NextResponse.json(
-        { success: false, error: 'Server configuration error' },
-        { status: 500 }
-      );
+    // Sanitize address a bit (strip "Address:" prefix)
+    const cleanedAddress = address.replace(/^\s*address[:\s]*/i, '').trim();
+
+    // Require CIVIC_API_KEY in prod; optional in dev
+    const civicApiKey = process.env.CIVIC_API_KEY;
+    if (process.env.NODE_ENV === 'production' && !civicApiKey) {
+      console.error('CIVIC_API_KEY missing in production');
+      return NextResponse.json({ success: false, error: 'Server configuration error' }, { status: 500 });
     }
 
-    if (edgeSecret) {
+    if (civicApiKey) {
       try {
-        const result = await invokeWithTimeout(async () => {
-          return await supabaseAdmin.functions.invoke('profile-address', {
-            body: { email, address },
-            headers: { 'x-edge-secret': edgeSecret }
-          });
-        }, 10000); // 10 second timeout
-        
-        const { data, error } = result;
-        if (!error && data?.data?.ocd_ids?.length) ocdIds = data.data.ocd_ids;
-        if (!error && data?.data?.zipcode) zipcode = data.data.zipcode;
-      } catch (err) {
-        if (err instanceof Error && err.message === 'Edge Function timeout') {
-          console.error('Edge Function timed out after 10 seconds');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+        const url = new URL('https://www.googleapis.com/civicinfo/v2/representatives');
+        url.searchParams.set('address', cleanedAddress);
+        url.searchParams.set('key', civicApiKey);
+
+        const res = await fetch(url.toString(), {
+          method: 'GET',
+          headers: { accept: 'application/json' },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const civic = await res.json();
+          // divisions is an object whose keys are OCD IDs
+          const divisions = civic?.divisions ?? {};
+          ocdIds = Object.keys(divisions);
+          // Prefer normalizedInput.zip if present
+          zipcode = civic?.normalizedInput?.zip ?? zipcode;
         } else {
-          console.error('profile-address invoke failed:', err);
+          console.error('civic_error', { status: res.status });
         }
-        // Continue without enrichment
+      } catch (err: any) {
+        console.error('civic_exception', err?.message || String(err));
+        // continue without enrichment
       }
     } else {
-      console.warn('EDGE_SHARED_SECRET missing; skipping profile-address enrichment in non-prod');
+      console.warn('CIVIC_API_KEY not set; skipping Civic enrichment in non-prod');
     }
 
     // 4) Create or update profile by email, then attach subscription
@@ -139,7 +144,7 @@ export async function POST(req: NextRequest) {
       .upsert(
         {
           email,
-          address,
+          address: cleanedAddress,
           zipcode,
           ocd_ids: ocdIds,
           ocd_last_verified_at: nowIso,
