@@ -173,6 +173,16 @@ export async function POST(req: NextRequest) {
 
     // 4) Create or update profile by email, then attach subscription
     const nowIso = new Date().toISOString();
+    
+    console.log('database_write_attempt', {
+      email,
+      address: cleanedAddress,
+      zipcode,
+      ocdIdsCount: ocdIds.length,
+      ocdIdsPreview: ocdIds.slice(0, 3),
+      timestamp: nowIso
+    });
+    
     const { data: profRow, error: profUpErr } = await supabaseAdmin
       .from('profiles')
       .upsert(
@@ -190,9 +200,19 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (profUpErr || !profRow?.user_id) {
-      console.error('profiles upsert failed or missing user_id:', profUpErr);
+      console.error('profiles_upsert_failed', { 
+        error: profUpErr,
+        hasData: !!profRow,
+        userId: profRow?.user_id 
+      });
       return NextResponse.json({ success: false, error: 'Database error' }, { status: 500 });
     }
+    
+    console.log('profiles_upsert_success', {
+      userId: profRow.user_id,
+      email,
+      ocdIdsWritten: ocdIds.length
+    });
 
     // Ensure default subscription (idempotent)
     const { error: subErr } = await supabaseAdmin
