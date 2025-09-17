@@ -116,6 +116,13 @@ export async function POST(req: NextRequest) {
         const url = new URL('https://www.googleapis.com/civicinfo/v2/divisionsByAddress');
         url.searchParams.set('address', cleanedAddress);
         url.searchParams.set('key', civicApiKey);
+        
+        console.log('civic_api_request', { 
+          url: url.toString(),
+          address: cleanedAddress,
+          keyLength: civicApiKey.length,
+          keyPrefix: civicApiKey.substring(0, 15) + '...'
+        });
 
         const res = await fetch(url.toString(), {
           method: 'GET',
