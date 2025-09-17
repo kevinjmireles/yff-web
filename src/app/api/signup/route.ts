@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 7000);
 
-        const url = new URL('https://www.googleapis.com/civicinfo/v2/representatives');
+        const url = new URL('https://www.googleapis.com/civicinfo/v2/divisionsByAddress');
         url.searchParams.set('address', cleanedAddress);
         url.searchParams.set('key', civicApiKey);
 
