@@ -103,10 +103,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (civicApiKey) {
+      // Validate API key format (Google API keys are typically 39+ chars)
+      if (civicApiKey.length < 30) {
+        console.error('civic_api_key_invalid', { keyLength: civicApiKey.length, keyPrefix: civicApiKey.substring(0, 10) });
+      }
+      
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 7000);
 
+        // CRITICAL: Use divisionsByAddress (NOT representatives) to get OCD IDs
         const url = new URL('https://www.googleapis.com/civicinfo/v2/divisionsByAddress');
         url.searchParams.set('address', cleanedAddress);
         url.searchParams.set('key', civicApiKey);
@@ -121,13 +127,34 @@ export async function POST(req: NextRequest) {
 
         if (res.ok) {
           const civic = await res.json();
+          console.log('civic_api_response', { 
+            hasData: !!civic, 
+            hasDivisions: !!civic?.divisions,
+            divisionsType: typeof civic?.divisions,
+            divisionsKeys: civic?.divisions ? Object.keys(civic.divisions).length : 0,
+            sampleKeys: civic?.divisions ? Object.keys(civic.divisions).slice(0, 3) : []
+          });
+          
           // divisions is an object whose keys are OCD IDs
           const divisions = civic?.divisions ?? {};
           ocdIds = Object.keys(divisions);
           // Prefer normalizedInput.zip if present
           zipcode = civic?.normalizedInput?.zip ?? zipcode;
+          
+          console.log('civic_extraction_result', { 
+            ocdIdsCount: ocdIds.length, 
+            zipcode,
+            firstThreeOcdIds: ocdIds.slice(0, 3)
+          });
         } else {
-          console.error('civic_error', { status: res.status });
+          const errorBody = await res.text().catch(() => 'Unable to read error body');
+          console.error('civic_api_error', { 
+            status: res.status, 
+            statusText: res.statusText,
+            headers: Object.fromEntries(res.headers.entries()),
+            body: errorBody,
+            url: url.toString()
+          });
         }
       } catch (err: any) {
         console.error('civic_exception', err?.message || String(err));

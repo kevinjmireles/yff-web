@@ -4,6 +4,17 @@
 
 ---
 
+## **🚨 CRITICAL: GOOGLE CIVIC API ENDPOINT**
+
+**⚠️ ALWAYS USE `divisionsByAddress` ENDPOINT:**
+- ✅ **CORRECT**: `https://www.googleapis.com/civicinfo/v2/divisionsByAddress`
+- ❌ **WRONG**: `https://www.googleapis.com/civicinfo/v2/representatives` 
+
+**Why this matters:**
+- `divisionsByAddress` returns political divisions with **OCD IDs as keys** ✅
+- `representatives` returns officials/offices data without OCD IDs ❌
+- Wrong endpoint = no OCD IDs in database = broken political targeting
+
 ## **🎯 CURRENT STATE SUMMARY**
 
 ### **Existing Implementation**
