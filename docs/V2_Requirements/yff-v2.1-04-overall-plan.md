@@ -8,37 +8,47 @@
 
 ```mermaid
 flowchart LR
-  A[Signup App (Next.js)] -->|address| B(Make: divisionsByAddress)
-  B -->|ocd_ids[]| S[(Supabase)]
-  C[Author CSV] --> D(Make: Importer)
-  D -->|content_slices| S
-  E[Admin Trigger] --> F(Make: Campaign Send)
-  S --> F
-  F -->|assembled email| G[SendGrid]
-  G --> H(Make: Webhook Ingest)
-  H -->|delivery_events| S
+  subgraph "User Signup Flow"
+    A[Signup Page] --> B{/api/signup API Route};
+    B --> C[Google Civic API];
+    C --> B;
+    B --> S[(Supabase DB)];
+  end
+
+  subgraph "Content & Campaign Flow"
+    D[Author CSV] --> E(Make.com: Importer);
+    E --> S;
+    F[Admin Trigger] --> G(Make.com: Campaign Send);
+    S --> G;
+    G --> H[SendGrid];
+    H --> I(Make.com: Webhook Ingest);
+    I --> S;
+  end
 ```
 
 **Responsibilities**
-- **Signup App:** capture email+address, call Make, show success/fail.
-- **Make (Enrichment):** call Google Civic `divisionsByAddress`, store `ocd_ids[]` in `profiles`.
-- **Content Importer:** validate CSV slices and upsert `content_slices`.
-- **Send Engine:** query `profiles`, assemble single article from slices, send, log.
-- **Edge Functions (optional):** `/log-delivery`, `/ingest-sendgrid`, `/unsubscribe`.
+- **Signup App & API Route:** Captures email+address, validates, calls Google Civic API for enrichment, and upserts the profile to Supabase.
+- **Content Importer (Make.com):** Validates CSV slices and upserts `content_slices`.
+- **Send Engine (Make.com):** Queries `profiles`, assembles single article from slices, sends, and logs.
+- **Edge Functions (Optional/Other):** Used for auxiliary tasks like unsubscribe handling, not for signup enrichment.
 
 ---
 
 ## Interfaces (contracts)
 
-- **Signup → Make (enrichment):**
+- **Frontend → API Route (/api/signup):**
 ```json
-{ "email":"a@b.com", "address":"123 Main, Upper Arlington, OH 43221" }
+{ "email":"a@b.com", "address":"123 Main, Upper Arlington, OH 43221", "recaptchaToken":"..." }
 ```
-- **Make → Supabase (profiles upsert):**
+- **API Route → Google Civic API:**
+```
+GET /civicinfo/v2/divisionsByAddress?address=123+Main+St,+Upper+Arlington,+OH+43221&key=API_KEY
+```
+- **API Route → Supabase (direct upsert):**
 ```json
-{ "email":"a@b.com", "address":"...", "zipcode":"43221",
+{ "email":"a@b.com", "address":"123 Main St, Upper Arlington, OH 43221", "zipcode":"43221",
   "ocd_ids":["ocd-division/country:us",".../state:oh",".../place:upper_arlington"],
-  "ocd_last_verified_at":"{{now}}"
+  "ocd_last_verified_at":"2025-09-19T18:14:44.199Z"
 }
 ```
 - **Admin → Send scenario:**

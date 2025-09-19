@@ -46,7 +46,8 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ## 🏗️ **Architecture**
 
 - **Frontend**: Next.js 15 with App Router
-- **Backend**: Supabase (PostgreSQL + RLS + Edge Functions)
+- **Backend**: Supabase (PostgreSQL + RLS) and Next.js API Routes
+  - **Note**: The primary user signup flow and address enrichment logic is handled directly within a Next.js API Route for simplicity and performance. Some auxiliary functions (like unsubscribe) may still use Supabase Edge Functions.
 - **Integration**: Make.com for workflow automation
 - **Email**: SendGrid for delivery
 - **Authentication**: Supabase Auth with RLS policies

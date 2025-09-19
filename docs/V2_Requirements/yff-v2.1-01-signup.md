@@ -1,19 +1,25 @@
-# YFF V2.1 — Signup & Enrichment (Address → OCD IDs → Supabase)
+# YFF V2.1 — Signup & Enrichment (API Route-First)
 
-**Goal:** Collect email + address/ZIP, resolve to **OCD IDs** using Google Civic *Divisions: `divisionsByAddress`*, and store them in Supabase so sends never call external APIs.
+**Goal:** Collect email + address/ZIP, resolve to **OCD IDs** using Google Civic's `divisionsByAddress` API, and store them directly in Supabase. This entire flow is handled by a single, robust Next.js API route.
 
 ---
 
-## Scope (MVP)
+## Scope (Current Implementation)
 
-- One public **/signup** page (Next.js) that collects **email** and **address/ZIP** with consent.
-- **Supabase Edge Function** `/profile-address` that calls **Google Civic `divisionsByAddress`** and writes the resulting **OCD IDs** to Supabase.
-- **Enhanced API route** `/api/signup` that handles reCAPTCHA validation, calls Edge Function for enrichment, and writes to database.
-- `profiles` is the single source of truth for a recipient's `ocd_ids[]`.
+- One public `/signup` page (Next.js) that collects **email** and **address/ZIP** with consent.
+- A single, consolidated **API route** (`/api/signup`) that performs all backend logic:
+  - Validates user input and reCAPTCHA tokens.
+  - Calls the **Google Civic `divisionsByAddress` API** directly for address enrichment.
+  - Creates or updates the user profile in the `profiles` table using an `upsert` operation.
+  - Ensures a default subscription exists in the `subscriptions` table.
+- The `profiles` table is the single source of truth for a recipient's `ocd_ids[]`.
+- The Supabase Edge Function `/profile-address` is **DEPRECATED** for this flow and is no longer called.
 
 ---
 
 ## Data Model (Supabase)
+
+The data model remains unchanged.
 
 ```sql
 create table if not exists profiles (
@@ -49,62 +55,36 @@ create policy "subscriptions_service_only" on subscriptions for all using (false
 create unique index if not exists idx_profiles_email_unique on profiles (email);
 create unique index if not exists idx_subscriptions_unique on subscriptions (user_id, list_key);
 ```
-
 **Notes**
 - `profiles.ocd_ids` holds canonical **OCD IDs** as strings (e.g., `ocd-division/country:us/state:oh/place:upper_arlington`).
-- `ocd_last_verified_at` lets us refresh stale data on a schedule.
-- Service role (Edge Functions) bypasses RLS via service key.
-- `subscriptions` table has FK constraint to `profiles.user_id` and unique constraint on `(user_id, list_key)`.
+- The API route uses the **Supabase Admin Client** (with the service role key) to bypass RLS for writes.
 
 ---
 
-## Google Civic — Divisions by Address
+## Signup & Enrichment Flow (Consolidated)
 
-**HTTP (GET):**  
-`https://www.googleapis.com/civicinfo/v2/divisionsByAddress?address=<URL_ENCODED>&key=<API_KEY>`
+The process has been simplified to remove the need for an intermediate Edge Function.
 
-**Response (abridged):**
-```json
-{
-  "normalizedInput": {"city":"Columbus","state":"OH","zip":"43221"},
-  "divisions": {
-    "ocd-division/country:us": {"name":"United States"},
-    "ocd-division/country:us/state:oh": {"name":"Ohio"},
-    "ocd-division/country:us/state:oh/county:franklin": {"name":"Franklin County"},
-    "ocd-division/country:us/state:oh/cd:3": {"name":"Ohio's 3rd congressional district"},
-    "ocd-division/country:us/state:oh/place:upper_arlington": {"name":"Upper Arlington"}
-  }
-}
-```
-**What to store:** the **keys** of `divisions` → array of OCD IDs.
+1.  **API Route `/api/signup`** receives form data from the client:
+    ```json
+    { "email": "a@b.com", "address": "123 Main St, Columbus, OH 43221", "recaptchaToken": "..." }
+    ```
 
----
+2.  **Server-Side Validation**:
+    - The API route validates the input against a Zod schema.
+    - It verifies the reCAPTCHA token with Google's API (if `RECAPTCHA_SECRET_KEY` is configured).
+    - It enforces rate limiting.
 
-## Supabase Edge Functions — Signup → Enrichment
+3.  **Direct Google Civic API Call**:
+    - The API route directly calls the Google Civic `divisionsByAddress` endpoint with the user's address and the `CIVIC_API_KEY`.
+    - It parses the response to extract the array of OCD ID strings from the `divisions` object keys.
 
-1) **API Route** `/api/signup` receives form data:
-```json
-{ "email": "a@b.com", "address": "123 Main St, Upper Arlington, OH 43221", "recaptchaToken": "..." }
-```
+4.  **Database Write (Upsert)**:
+    - The API route connects to Supabase using the Admin client.
+    - It performs an **`upsert`** on the `profiles` table, matching on the unique `email` field. This single operation either creates a new profile or updates an existing one with the new address and OCD IDs.
+    - It then performs another `upsert` on the `subscriptions` table to ensure the user has a default, active subscription.
 
-2) **reCAPTCHA validation** (if configured) using `RECAPTCHA_SECRET_KEY`.
-
-3) **Edge Function call** `/profile-address` with authentication header:
-```typescript
-const { data, error } = await supabaseAdmin.functions.invoke('profile-address', {
-  body: { email, address },
-  headers: { 'x-edge-secret': process.env.EDGE_SHARED_SECRET! }
-});
-```
-
-4) **Edge Function** calls Google Civic `divisionsByAddress` and returns:
-```json
-{ "ok": true, "data": { "zipcode": "43221", "ocd_ids": ["ocd-division/country:us", ".../state:oh", ".../place:upper_arlington"] } }
-```
-
-5) **Database writes** (if `profiles.user_id` exists):
-   - Update `profiles` with address data and OCD IDs
-   - Upsert `subscriptions` row for `general` list
+This consolidated approach is simpler, faster, and easier to maintain and debug.
 
 ---
 
@@ -117,74 +97,17 @@ const { data, error } = await supabaseAdmin.functions.invoke('profile-address', 
 
 ---
 
-## Request Validation & Error Handling
-
-```typescript
-const SignupPayload = z.object({
-  name: z.string().optional(),
-  email: z.string().email(),
-  address: z.string().min(6, 'Address seems too short'),
-  recaptchaToken: z.string().nullable().optional()
-});
-
-// Standard error response
-type ErrorResponse = {
-  success: false;
-  error: string;
-};
-
-// Success response
-type SuccessResponse = {
-  success: true;
-  message: string;
-  data: {
-    districtsFound: number;
-    email: string;
-    zipcode: string | null;
-    hasSubscription: boolean;
-  };
-};
-```
-
-**Rate limiting:** Reject if attempts for IP ≥5 in last 60 seconds.
-
-**reCAPTCHA:** Optional validation if `RECAPTCHA_SECRET_KEY` is configured.
-
-**Idempotency:** Upsert on email ensures safe retries.
-
----
-
-## TDD — Acceptance Tests
-
-### Core Functionality
-- Valid OH address → `profiles.ocd_ids` contains `country:us`, `state:oh`, `county:franklin`, `cd:3`, `place:upper_arlington`.
-- Re‑signup with same email updates the address and refreshes `ocd_ids`.
-- Invalid address → error surfaced to UI; no DB write.
-- Edge Function enrichment → returns `{success: true, data: {districtsFound: N}}`.
-
-### Security & Rate Limiting
-- Rate-limit: 6th submit in 60 seconds → 429 with error schema.
-- reCAPTCHA validation → fails if token invalid (when configured).
-- Edge Function authentication → requires `x-edge-secret` header.
-- Duplicate email re-signup updates ocd_ids and leaves one subscriptions row.
-
-### Error Handling
-- Google 5xx/timeout → Edge Function continues without enrichment.
-- Validation failure → returns `{success: false, error: "Invalid input"}`.
-- reCAPTCHA failure → returns `{success: false, error: "reCAPTCHA verification failed"}`.
-
----
-
 ## Environment Variables
+
+The `EDGE_SHARED_SECRET` is no longer required for the signup flow but may be used by other Edge Functions.
 
 ### Required (Vercel Project Settings)
 - `SUPABASE_URL` - Supabase project URL (server-side)
 - `SUPABASE_SERVICE_ROLE_KEY` - Service role key for database writes (server-side)
-- `EDGE_SHARED_SECRET` - Secret for Edge Function authentication
+- `CIVIC_API_KEY` - Google Civic API key for address enrichment.
 
 ### Optional
 - `RECAPTCHA_SECRET_KEY` - reCAPTCHA validation (if not set, skips validation)
-- `CIVIC_API_KEY` - Google Civic API key (for address enrichment)
 
 ### Client-Side (Next.js)
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL (client-side)

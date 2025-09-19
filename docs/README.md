@@ -9,6 +9,9 @@ Welcome to the Your Friend Fido documentation. Everything you need to build, run
 - [Code Review Checklist](./guides/code_review_checklist.md)
 - [LLM-Friendly Documentation Guide](./guides/llm_friendly_documentation.md)
 
+## 🏛️ Architectural Decisions
+- [ADR-001: Signup Enrichment in API Route](./adr/001-signup-enrichment-in-api-route.md)
+
 ## 🛠 Plans
 - [Migration Plan](./plans/migration_plan.md)
 - [Legal Compliance Runbook](./plans/legal_compliance.md)
