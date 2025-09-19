@@ -13,6 +13,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+
+// Ensure this route runs on Node.js runtime (required for supabase admin client)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 import { checkRateLimit } from '@/lib/rateLimiter'
 
 const BodySchema = z.object({
@@ -117,12 +121,6 @@ export async function POST(req: NextRequest) {
         url.searchParams.set('address', cleanedAddress);
         url.searchParams.set('key', civicApiKey);
         
-        console.log('civic_api_request', { 
-          url: url.toString(),
-          address: cleanedAddress,
-          keyLength: civicApiKey.length,
-          keyPrefix: civicApiKey.substring(0, 15) + '...'
-        });
 
         const res = await fetch(url.toString(), {
           method: 'GET',
@@ -134,25 +132,12 @@ export async function POST(req: NextRequest) {
 
         if (res.ok) {
           const civic = await res.json();
-          console.log('civic_api_response', { 
-            hasData: !!civic, 
-            hasDivisions: !!civic?.divisions,
-            divisionsType: typeof civic?.divisions,
-            divisionsKeys: civic?.divisions ? Object.keys(civic.divisions).length : 0,
-            sampleKeys: civic?.divisions ? Object.keys(civic.divisions).slice(0, 3) : []
-          });
-          
           // divisions is an object whose keys are OCD IDs
           const divisions = civic?.divisions ?? {};
           ocdIds = Object.keys(divisions);
           // Prefer normalizedInput.zip if present
           zipcode = civic?.normalizedInput?.zip ?? zipcode;
           
-          console.log('civic_extraction_result', { 
-            ocdIdsCount: ocdIds.length, 
-            zipcode,
-            firstThreeOcdIds: ocdIds.slice(0, 3)
-          });
         } else {
           const errorBody = await res.text().catch(() => 'Unable to read error body');
           console.error('civic_api_error', { 
@@ -174,14 +159,6 @@ export async function POST(req: NextRequest) {
     // 4) Create or update profile by email, then attach subscription
     const nowIso = new Date().toISOString();
     
-    console.log('database_write_attempt', {
-      email,
-      address: cleanedAddress,
-      zipcode,
-      ocdIdsCount: ocdIds.length,
-      ocdIdsPreview: ocdIds.slice(0, 3),
-      timestamp: nowIso
-    });
     
     const { data: profRow, error: profUpErr } = await supabaseAdmin
       .from('profiles')
@@ -208,11 +185,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Database error' }, { status: 500 });
     }
     
-    console.log('profiles_upsert_success', {
-      userId: profRow.user_id,
-      email,
-      ocdIdsWritten: ocdIds.length
-    });
 
     // Ensure default subscription (idempotent)
     const { error: subErr } = await supabaseAdmin
@@ -232,7 +204,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Database error' }, { status: 500 });
     }
 
-    // 5) Response
+    // 5) Success monitoring log
+    console.log('signup_ok', { email, zipcode, nOcd: ocdIds.length });
+
+    // 6) Response
     return NextResponse.json({
       success: true,
       message: 'Thanks for signing up!',
@@ -244,7 +219,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Signup API failed:', error);
+    console.error('signup_failed', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ success: false, error: 'Signup failed. Please try again.' }, { status: 500 });
   }
 }

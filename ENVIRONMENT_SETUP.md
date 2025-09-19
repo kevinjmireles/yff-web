@@ -10,7 +10,8 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# Google Civic API (Server-side only) - USES divisionsByAddress endpoint
+# Google Civic API (Server-side only) - REQUIRED for address enrichment
+# Uses divisionsByAddress endpoint directly in API route (not Edge Functions)
 CIVIC_API_KEY=your_google_civic_api_key
 
 # Application Configuration
@@ -25,7 +26,8 @@ FEATURE_ADMIN_IMPORTS=false
 NEXT_PUBLIC_RECAPTCHA_SITE_KEY=your_recaptcha_site_key
 RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key
 
-# Edge Functions (unused by signup, kept for other functions)
+# Edge Functions (DEPRECATED for signup - now uses direct API route)
+# Kept for other functions that may still use profile-address Edge Function
 EDGE_SHARED_SECRET=your_edge_shared_secret
 
 # Make.com Webhook
@@ -40,7 +42,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-# Google Civic API (Optional in dev)
+# Google Civic API (Required for address enrichment testing)
 CIVIC_API_KEY=
 
 # Application Configuration
@@ -55,7 +57,7 @@ FEATURE_ADMIN_IMPORTS=false
 NEXT_PUBLIC_RECAPTCHA_SITE_KEY=
 RECAPTCHA_SECRET_KEY=
 
-# Edge Functions (unused by signup, kept for other functions)
+# Edge Functions (DEPRECATED for signup, kept for other functions)
 EDGE_SHARED_SECRET=
 
 # Make.com Webhook (Optional in dev)
@@ -66,9 +68,10 @@ NEXT_PUBLIC_MAKE_WEBHOOK_URL=
 
 ### **1. Vercel Deployment:**
 1. Go to Project → Settings → Environment Variables
-2. Add each variable above (including new CIVIC_API_KEY for address enrichment)
+2. Add each variable above (CIVIC_API_KEY is **REQUIRED** for signup functionality)
 3. **IMPORTANT**: Do NOT set CIVIC_API_KEY as NEXT_PUBLIC_* (server-side only)
-4. Redeploy from the latest commit
+4. **NOTE**: Signup now uses direct API route integration (not Edge Functions)
+5. Redeploy from the latest commit
 
 ### **2. Local Development:**
 1. Copy `.env.local.example` to `.env.local`
@@ -79,9 +82,10 @@ NEXT_PUBLIC_MAKE_WEBHOOK_URL=
 - ✅ **Never commit** `.env.local` to git
 - ✅ **Use environment variables** in Vercel
 - ✅ **No service role keys** in web app
-- ✅ **CIVIC_API_KEY server-side only** (never NEXT_PUBLIC_*)
+- ✅ **CIVIC_API_KEY server-side only** (never NEXT_PUBLIC_*) - **REQUIRED for signup**
 - ✅ **reCAPTCHA optional** in development
-- ✅ **EDGE_SHARED_SECRET unused by signup** but kept for other Edge Functions
+- ✅ **EDGE_SHARED_SECRET deprecated for signup** (direct API route used instead)
+- ✅ **Edge Functions kept** for compatibility with other features
 
 ## 🧪 **Testing Commands:**
 
