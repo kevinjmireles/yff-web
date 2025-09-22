@@ -1,76 +1,53 @@
-# Your Friend Fido
 
-[![Docs](https://img.shields.io/badge/Docs-📖-blue)](/docs/README.md)
+# YFF — MVP (v2.1)
 
-**Your Friend Fido** is a personalized civic engagement platform that delivers location-relevant news and civic updates to users based on their address and political jurisdiction.
+This repo sends **personalized civic newsletters**. Editors write **one article**, and recipients get local context via tokens (ZIP + delegation).
 
-## 🎯 **Project Overview**
+## Quick Start
+1. **Author an article** (row = complete email) → export CSV.  
+2. **Upload ZIP metrics CSV** (one row per ZIP) with fields like `hazard_flag`, `hazard_notes`.  
+3. Add tokens to your article body:  
+   - `[[DELEGATION]]` → inserts Rep + Senators with contacts  
+   - `[[ZIP_STATS]]` → compact snapshot from ZIP metrics  
+   - `[[ZIP.<field>]]` → single field (e.g., `[[ZIP.hazard_notes]]`)  
+4. **Preview** by subscriber → **Send** test → **Send** campaign.
 
-This platform collects user addresses, resolves them to Open Civic Data (OCD) identifiers, and delivers personalized content about local government, elections, and civic issues that matter to each user's specific location.
+## Docs & Specs
+- PRD: `prd_updated.md`
+- Requirements: `requirements_updated.md`
+- Data Dictionary (canonical): `data_dictionary_canonical.md`
+- Content Import Spec: `content_import_updated.md`
+- Send Spec: `send_updated.md`
+- Overall Plan: `overall_plan_updated.md`
+- ZIP Explainer: `ZIP_Personalization_Explainer.md`
+- ZIP Step-by-Step: `ZIP_Personalization_Step_by_Step.md`
 
-## 📚 **Documentation**
+## Migrations & Policies
+- Schema migration (idempotent): `schema_migration_v2_1.sql`
+- DB Migration Checklist: `db_migration_checklist.md`
+- RLS policy stubs (Supabase): `rls_policy_stubs.sql`
 
-### **Current Specifications (V2.1)**
-- **[Signup & Enrichment](docs/V2_Requirements/yff-v2.1-01-signup.md)** - User signup flow and address enrichment
-- **[Content Import](docs/V2_Requirements/yff-v2.1-02-content-import.md)** - CSV-based content authoring and import
-- **[Assembly & Send](docs/V2_Requirements/yff-v2.1-03-send.md)** - Newsletter assembly and delivery engine
-- **[Overall Plan](docs/V2_Requirements/yff-v2.1-04-overall-plan.md)** - Complete architecture and implementation guide
+## Design Principles
+- **Simplest usable path**: row = complete email.  
+- **Future-ready**: generic `geo_metrics` (ZIP now, counties/cities/districts later without schema change).  
+- **Observable**: delivery history + provider events.  
+- **Compliant**: unsubscribe and CAN-SPAM essentials.
 
-### **Database Schema**
-- **[Consolidated SQL Patch](docs/V2_Requirements/yff-v2.1_sql_patch.sql)** - Complete database setup with RLS policies
-
-### **Schema Documentation**
-- **[Table Inventory](docs/functional/table_inventory.csv)** - Source of truth for database tables
-- **[Data Dictionary](docs/functional/data_dictionary.md)** - Complete field-level documentation
-- **[Excel Export](docs/exports/YFF_V2.1_Data_Dictionary.xlsx)** - Generated from CSV (run `npm run build:dict` to regenerate)
-
-### **Legacy Documentation**
-- **[Deprecated V2 Docs](docs/deprecated/)** - Previous versions (archived)
-
-## 🚀 **Getting Started**
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Roadmap (Next)
+- Enable `geo_type=cd` metrics + `[[DISTRICT_*]]` tokens.  
+- Add partner attribution (`partner_id`).  
+- Light delivery summaries.  
 
 ## 🏗️ **Architecture**
 
 - **Frontend**: Next.js 15 with App Router
 - **Backend**: Supabase (PostgreSQL + RLS) and Next.js API Routes
-  - **Note**: The primary user signup flow and address enrichment logic is handled directly within a Next.js API Route for simplicity and performance. Some auxiliary functions (like unsubscribe) may still use Supabase Edge Functions.
-- **Integration**: Make.com for workflow automation
-- **Email**: SendGrid for delivery
 - **Authentication**: Supabase Auth with RLS policies
+
+**Targeting**
+- Prefer `audience_rule` (string) stored in `content_items.metadata`.
+- Rule → SQL on `v_subscriber_geo`; fallback to `ocd_scope` if rule is empty.
 
 ## 🔒 **Security Features**
 
 - Row Level Security (RLS) on all tables
-- Service role access only for sensitive operations
-- Rate limiting and reCAPTCHA protection
-- HMAC-based unsubscribe tokens
-- PII minimization and data retention policies
-
-## 📖 **Learn More**
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## 🚀 **Deploy on Vercel**
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

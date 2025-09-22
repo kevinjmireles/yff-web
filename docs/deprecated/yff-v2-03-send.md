@@ -1,8 +1,4 @@
-# DEPRECATED – YFF V2 — Article/Newsletter Assembly & Send
-
-> **⚠️ DEPRECATED** - This document has been superseded by YFF V2.1. See `docs/V2_Requirements/` for current specifications.
-
----
+# YFF V2 — Article/Newsletter Assembly & Send
 
 **Goal:** For each recipient, assemble **one personalized article** from slices (by `article_key`) using their stored **OCD IDs**, then send via SendGrid. No external lookups at send time.
 

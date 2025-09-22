@@ -1,0 +1,90 @@
+# Content Import Specification (v2.1)
+
+_Last updated: 2025-09-22_
+
+## Purpose
+Define how content is authored, structured, and imported so the system can send **one newsletter per subscriber**, personalized to their location (ZIP and OCD IDs). The schema must support MVP now and extend easily later (state, county, city, district).
+
+---
+
+## 1. Content CSV/XLSX (row = complete email)
+Each row represents **one complete newsletter variant**.
+
+### Required Columns
+| Column | Required | Type | Notes |
+|--------|----------|------|-------|
+| `content_id` | ✅ | text | Stable slug for dedupe/versioning (e.g. `water-policy-2025-09-20`) |
+| `email_subject` | ✅ | text | Subject line shown in inbox |
+| `title` | ✅ | text | Headline shown inside email |
+| `body_markdown` | ✅ | markdown | Full article body. Supports tokens (see below). |
+| `scope_value` | optional | text | OCD ID for targeted variant (e.g. `ocd-division/country:us/state:oh/cd:15`). Leave blank for global fallback. |
+| `send_after` | optional | ISO8601 datetime | Blank = eligible immediately |
+| `tags` | optional | text (comma-sep) | Freeform labels for filtering, reporting |
+
+### Optional Columns
+- `subtitle` (dek/subheading)  
+- `byline` (author line)
+
+---
+
+## 2. Token Expansion
+Tokens inside `body_markdown` are expanded at render time based on subscriber attributes and geo metrics.
+
+### MVP tokens
+- `[[DELEGATION]]` → Inserts subscriber’s US Rep + Senators with contacts (from `officials` + `official_contacts`)  
+- `[[ZIP_STATS]]` → Renders compact summary of subscriber’s ZIP metrics  
+- `[[ZIP.<field>]]` → Inserts specific field from `geo_metrics` (`geo_type=zip`)  
+
+### Future extensions
+- `[[DISTRICT_STATS]]`, `[[COUNTY_STATS]]`, `[[CITY_STATS]]` → same mechanism, different `geo_type`  
+- `[[DISTRICT.<field>]]` etc.  
+
+---
+
+## 3. Metrics Import
+A separate import populates the `geo_metrics` table.
+
+### Table schema
+```
+geo_metrics
+- geo_type text   -- e.g., 'zip', 'county', 'cd'
+- geo_id   text   -- canonical ID for that type (ZIP=5-digit, CD=OCD ID, county=FIPS)
+- as_of    date   -- latest wins
+- metrics  jsonb  -- arbitrary fields from CSV
+```
+
+### CSV Rules
+- Must include `geo_id` column (name depends on `geo_type`):
+  - ZIP: `zip` (string, 5-digit, padded if needed)
+  - Others: OCD ID or agreed canonical ID
+- All other columns become `metrics` JSON keys
+- Import is upsert on `(geo_type, geo_id, as_of)`
+
+---
+
+## 4. Fallback Rules
+When multiple content rows exist:
+1. Match most specific `scope_value` in subscriber’s `ocd_ids`  
+2. If no match, fall back to state → country → global (blank `scope_value`)  
+
+If a token has no value (e.g. `[[ZIP.hazard_notes]]` missing), renderer omits it or substitutes neutral fallback.
+
+---
+
+## 5. Authoring Workflow
+1. Write article in Markdown editor.  
+2. Paste into `body_markdown` cell of content sheet.  
+3. Add tokens where needed.  
+4. Export as CSV.  
+5. Upload via `/api/content/import`.  
+6. Upload ZIP metrics via `/api/metrics/import?geo_type=zip`.  
+7. Preview by subscriber.  
+8. Send campaign.
+
+---
+
+✅ This version aligns with:
+- **Row = full email** (not blocks)  
+- **Generic geo_metrics** future-proofing (ZIP only for MVP)  
+- **Token system** (delegation + ZIP)  
+- **Fallback hierarchy**  

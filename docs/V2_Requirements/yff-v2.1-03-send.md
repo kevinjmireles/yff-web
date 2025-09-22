@@ -66,14 +66,23 @@ where ocd_ids @> array['ocd-division/country:us/state:oh'];
 
 ## Assembly Rules (deterministic, easy to test)
 
-1) Load **published** slices for `article_key` within time window.
-2) Keep slice if `scope_ocd_id is null` **or** `scope_ocd_id ∈ recipient.ocd_ids`.
-3) **Headline**: choose the most specific matching slice with `is_headline=true`;  
-   if none, fall back to the first matching slice that has a `title/dek`.
-4) **Body order**: sort kept body slices by  
-   `section_order ASC`, then **broad→narrow** (shorter `scope_ocd_id` first), then `sort_index ASC`.
-5) Concatenate `body_md` blocks with `\n\n` into **one Markdown/HTML blob**.
-6) Inject into a single SendGrid template (no extra URLs unless provided in copy).
+### Targeting precedence
+- If `v2_content_items.metadata.audience_rule` is present → **use it**.
+- Else → fallback to `ocd_scope` (US → state → county → place via existing `profiles.ocd_ids`).
+
+### V1 audience_rule grammar (simple)
+- Fields: `state`, `county_fips`, `place`
+- Ops: `==`, `in [..]`
+- Combiner: `or` only
+
+### Data sources (no subscribers dependency)
+- Recipients: `v_recipients` (from `profiles`)
+- Geo filter: `v_subscriber_geo` (from `geo_metrics`)
+- Attempts table: `delivery_attempts(user_id, content_item_id)` with unique index to guarantee no duplicates.
+
+### Acceptance tests
+- Rule test: an item with `audience_rule = "state == 'OH'"` selects only OH users.
+- Fallback test: an item with `ocd_scope = place:columbus,oh` selects Columbus when rule absent.
 
 ---
 

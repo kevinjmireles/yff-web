@@ -11,7 +11,7 @@ Capture functional and non-functional requirements for the MVP system. For scope
 ### Signup & Profiles
 - Collect subscriber email + address.  
 - Enrich address to derive ZIP + OCD IDs (district, county, state).  
-- Store in `profiles` (single source of truth).  
+- Store in `subscribers` and `profiles`.  
 - Provide unsubscribe and preference management.  
 
 ### Content Import
@@ -69,16 +69,6 @@ Capture functional and non-functional requirements for the MVP system. For scope
 - **Performance**: Preload unique metrics per batch for speed.  
 - **Extensibility**: Schema supports new `geo_type` without migration.  
 - **Observability**: Logs for imports, sends, expansions, errors.  
-
-## Targeting requirements
-- The system **shall** support audience targeting via `content_items.metadata.audience_rule` (preferred) with fallback to `ocd_scope`.
-- V1 grammar: fields `state|county_fips|place`; ops `==` and `in [...]`; combiner `or`.
-- The send engine **shall** evaluate `audience_rule` by translating it to SQL WHERE conditions on `v_subscriber_geo`.
-
-## Non-functional
-- `geo_metrics` writes are idempotent and index-backed.
-- Promotion RPC remains the **only** path from staging → final.
-- Dedupe invariant: `UNIQUE (subscriber_id, content_item_id)` in `delivery_attempts`.
 
 ---
 
