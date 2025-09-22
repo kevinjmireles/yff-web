@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { parseAudienceRule, executeAudienceRule } from '@/lib/audienceRule';
+import { isFeatureEnabled } from '@/lib/features';
 
 const runJobSchema = z.object({
   job_id: z.string().uuid('Invalid job ID format').optional(),
@@ -20,6 +21,18 @@ const BATCH_LIMIT = 200;
 
 export async function POST(request: NextRequest) {
   try {
+    // Feature flag check
+    if (!isFeatureEnabled('sendRun')) {
+      return NextResponse.json(
+        { 
+          ok: false, 
+          code: 'FEATURE_DISABLED', 
+          message: 'Send functionality is currently disabled' 
+        },
+        { status: 503 }
+      );
+    }
+
     // TODO: Add admin authentication check here
     // For now, we'll implement the core functionality
     

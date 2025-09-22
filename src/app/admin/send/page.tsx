@@ -8,6 +8,7 @@
 'use client';
 
 import { useState } from 'react';
+import { isFeatureEnabled } from '@/lib/features';
 
 interface SendJob {
   job_id: string;
@@ -33,6 +34,18 @@ export default function AdminSendPage() {
   const [jobTotals, setJobTotals] = useState<JobTotals | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Feature flag check
+  if (!isFeatureEnabled('adminSend')) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <h1 className="text-3xl font-bold mb-6">Send Management</h1>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+          <p className="text-yellow-800">This feature is currently disabled.</p>
+        </div>
+      </div>
+    );
+  }
 
   const createJob = async () => {
     if (!datasetId.trim()) {

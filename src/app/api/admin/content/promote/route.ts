@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { isFeatureEnabled } from '@/lib/features';
 
 const promoteSchema = z.object({
   dataset_id: z.string().uuid('Invalid dataset ID format'),
@@ -16,6 +17,18 @@ const promoteSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Feature flag check
+    if (!isFeatureEnabled('contentPromote')) {
+      return NextResponse.json(
+        { 
+          ok: false, 
+          code: 'FEATURE_DISABLED', 
+          message: 'Content promotion is currently disabled' 
+        },
+        { status: 503 }
+      );
+    }
+
     // TODO: Add admin authentication check here
     // For now, we'll implement the core functionality
     

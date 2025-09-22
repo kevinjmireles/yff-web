@@ -1,8 +1,40 @@
-// Purpose: Feature flag helpers from env.
-// Called by: any WIP feature surfaces.
+/**
+ * Feature Flags for V2.1 Functionality
+ * 
+ * Purpose: Control access to new features in production
+ * Default: All features ON (current behavior) but controllable via environment
+ */
 
-type Flag = 'FEATURE_DELEGATION_TOKENS' | 'FEATURE_ADMIN_IMPORTS'
+export const features = {
+  // Admin functionality
+  adminSend: process.env.FEATURE_ADMIN_SEND !== '0', // Default ON
+  adminAuth: process.env.FEATURE_ADMIN_AUTH !== '0', // Default ON
+  
+  // Send functionality
+  sendRun: process.env.FEATURE_SEND_RUN !== '0', // Default ON
+  sendPreview: process.env.FEATURE_SEND_PREVIEW !== '0', // Default ON
+  
+  // Content functionality
+  contentPromote: process.env.FEATURE_CONTENT_PROMOTE !== '0', // Default ON
+  
+  // Development flags
+  debugMode: process.env.NODE_ENV === 'development',
+  verboseLogging: process.env.VERBOSE_LOGGING === '1',
+} as const;
 
-export function isFeatureEnabled(flag: Flag): boolean {
-  return String(process.env[flag]).toLowerCase() === 'true'
+/**
+ * Check if a feature is enabled
+ */
+export function isFeatureEnabled(feature: keyof typeof features): boolean {
+  return features[feature];
+}
+
+/**
+ * Get feature status for debugging
+ */
+export function getFeatureStatus() {
+  return Object.entries(features).reduce((acc, [key, value]) => {
+    acc[key] = value;
+    return acc;
+  }, {} as Record<string, boolean>);
 }
