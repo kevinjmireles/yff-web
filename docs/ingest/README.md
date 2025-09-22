@@ -28,11 +28,11 @@ September-Launch,columbus-city-news-1,"Columbus news","Downtown updates.",place:
 
 ## 2) DB contracts (recap)
 
-- **Staging:** `content_items_staging`
-- **Final:** `content_items` (unique `(dataset_id,row_uid)`)
+- **Staging:** `v2_content_items_staging`
+- **Final:** `v2_content_items` (unique `(dataset_id,row_uid)`)
 - **Datasets:** `content_datasets(status)`
 - **Runs:** `ingest_runs`
-- **Promotion:** `select promote_dataset(:dataset_id)`
+- **Promotion:** `select promote_dataset_v2(:dataset_id)`
 - **Geo attributes:** `geo_metrics` table + `v_subscriber_geo` view store flexible subscriber geography for audience rules.
 
 Make **only** writes to `content_items_staging` and `ingest_runs`; the Admin **Promote** button calls the RPC.
