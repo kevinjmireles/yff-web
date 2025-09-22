@@ -7,8 +7,8 @@
 
 'use client';
 
-import { useState } from 'react';
-import { isFeatureEnabled } from '@/lib/features';
+import { useState, useEffect } from 'react';
+import { isFeatureEnabled as checkFeatureEnabled } from '@/lib/features';
 
 interface SendJob {
   job_id: string;
@@ -34,9 +34,33 @@ export default function AdminSendPage() {
   const [jobTotals, setJobTotals] = useState<JobTotals | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFeatureEnabled, setIsFeatureEnabled] = useState<boolean | null>(null);
+
+  // Check feature flag on client side
+  useEffect(() => {
+    try {
+      const enabled = checkFeatureEnabled('adminSend');
+      setIsFeatureEnabled(enabled);
+    } catch (err) {
+      console.error('Feature flag check failed:', err);
+      setIsFeatureEnabled(true); // Default to enabled if check fails
+    }
+  }, []);
+
+  // Show loading state while checking feature flag
+  if (isFeatureEnabled === null) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <h1 className="text-3xl font-bold mb-6">Send Management</h1>
+        <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+          <p className="text-gray-800">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Feature flag check
-  if (!isFeatureEnabled('adminSend')) {
+  if (!isFeatureEnabled) {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <h1 className="text-3xl font-bold mb-6">Send Management</h1>
@@ -62,6 +86,12 @@ export default function AdminSendPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataset_id: datasetId })
       });
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
 
       const result = await response.json();
 
@@ -96,6 +126,12 @@ export default function AdminSendPage() {
           dataset_id: lastJob ? undefined : datasetId
         })
       });
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
 
       const result = await response.json();
 

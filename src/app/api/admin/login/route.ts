@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Set admin cookie and redirect
-    return setAdminCookie();
+    return setAdminCookie(request);
 
   } catch (error) {
     if (error instanceof z.ZodError) {

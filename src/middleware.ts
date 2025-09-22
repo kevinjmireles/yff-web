@@ -22,6 +22,28 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // Protect API routes that require admin access (except login)
+  if ((pathname.startsWith('/api/send') || pathname.startsWith('/api/admin')) && pathname !== '/api/admin/login') {
+    // Check if admin authentication is enabled
+    if (isFeatureEnabled('adminAuth')) {
+      const adminCookie = request.cookies.get('yff_admin');
+      if (adminCookie?.value !== '1') {
+        // Return 401 for API routes instead of redirecting
+        return new NextResponse(
+          JSON.stringify({ 
+            ok: false, 
+            code: 'UNAUTHORIZED', 
+            message: 'Authentication required' 
+          }),
+          { 
+            status: 401, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+    }
+  }
+
   // Add security headers
   const response = NextResponse.next();
   

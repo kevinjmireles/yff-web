@@ -6,7 +6,7 @@
  */
 
 import { cookies } from 'next/headers';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { isFeatureEnabled } from './features';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
@@ -38,20 +38,32 @@ export function verifyAdminPassword(password: string): boolean {
 /**
  * Set admin authentication cookie
  */
-export function setAdminCookie(): Response {
-  const response = new Response(null, { status: 302 });
-  response.headers.set('Location', '/admin/send');
-  response.headers.set('Set-Cookie', `${ADMIN_COOKIE_NAME}=${ADMIN_COOKIE_VALUE}; Path=/; Max-Age=${COOKIE_MAX_AGE}; HttpOnly; Secure; SameSite=Strict`);
+export function setAdminCookie(request?: NextRequest): NextResponse {
+  const baseUrl = request ? request.url.split('/api')[0] : 'http://localhost:3000';
+  const response = NextResponse.redirect(new URL('/admin/send', baseUrl));
+  response.cookies.set(ADMIN_COOKIE_NAME, ADMIN_COOKIE_VALUE, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: COOKIE_MAX_AGE,
+    path: '/',
+    sameSite: 'strict',
+  });
   return response;
 }
 
 /**
  * Clear admin authentication cookie
  */
-export function clearAdminCookie(): Response {
-  const response = new Response(null, { status: 302 });
-  response.headers.set('Location', '/admin/login');
-  response.headers.set('Set-Cookie', `${ADMIN_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`);
+export function clearAdminCookie(request?: NextRequest): NextResponse {
+  const baseUrl = request ? request.url.split('/api')[0] : 'http://localhost:3000';
+  const response = NextResponse.redirect(new URL('/admin/login', baseUrl));
+  response.cookies.set(ADMIN_COOKIE_NAME, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 0,
+    path: '/',
+    sameSite: 'strict',
+  });
   return response;
 }
 

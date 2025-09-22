@@ -9,11 +9,9 @@ export const metadata: Metadata = {
   description: "Get personalized news based on your location and engage with your elected officials. Join the movement to bring journalism and civic life into the 21st century.",
   icons: {
     // Standard icon for browser tabs and bookmarks
-    icon: '/favicon.png?v=1',
-    // Fallback for older browsers
-    shortcut: '/favicon.png?v=1',
+    icon: '/favicon.ico',
     // Icon for Apple devices (e.g., when saved to home screen)
-    apple: '/apple-icon.png?v=1',
+    apple: '/apple-icon.png',
   },
 };
 
