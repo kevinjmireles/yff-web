@@ -17,13 +17,13 @@ const COOKIE_MAX_AGE = 8 * 60 * 60; // 8 hours
 /**
  * Check if user is authenticated as admin
  */
-export function isAdminAuthenticated(): boolean {
+export async function isAdminAuthenticated(): Promise<boolean> {
   if (!process.env.ADMIN_PASSWORD) {
     // If no password set, allow access in development
     return process.env.NODE_ENV === 'development';
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const adminCookie = cookieStore.get(ADMIN_COOKIE_NAME);
   return adminCookie?.value === ADMIN_COOKIE_VALUE;
 }
