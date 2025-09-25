@@ -1,17 +1,12 @@
-/**
- * Admin Login Page (Server Component)
- * 
- * Purpose: Server wrapper for admin authentication with dynamic rendering
- * Security: Forces dynamic rendering to prevent static prerendering
- */
+import { headers } from 'next/headers';
+import LoginForm from './LoginForm';
 
-// Force dynamic rendering - these exports must be in a server component
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'default-no-store';
 
-import LoginPageClient from './LoginPageClient';
-
-export default function AdminLoginPage() {
-  return <LoginPageClient />;
+export default function Page() {
+  // Force dynamic at runtime; Next cannot prerender this page.
+  headers();
+  return <LoginForm />;
 }
