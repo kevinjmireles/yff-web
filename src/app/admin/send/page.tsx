@@ -171,6 +171,12 @@ export default function AdminSendPage() {
             type="text"
             value={datasetId}
             onChange={(e) => setDatasetId(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                createJob();
+              }
+            }}
             placeholder="Enter dataset UUID"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
