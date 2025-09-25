@@ -7,6 +7,7 @@ export const config = {
 
 export default function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  console.log('🔍 Middleware running for:', pathname);
 
   const isAdminUI  = pathname.startsWith('/admin/');
   const isAdminAPI = pathname.startsWith('/api/admin/');
