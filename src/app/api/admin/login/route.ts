@@ -5,6 +5,10 @@
  * Security: Password verification with secure cookie setting
  */
 
+// Never cache auth endpoints
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyAdminPassword, setAdminCookieJson } from '@/lib/adminAuth';
