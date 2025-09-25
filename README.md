@@ -51,3 +51,4 @@ This repo sends **personalized civic newsletters**. Editors write **one article*
 ## 🔒 **Security Features**
 
 - Row Level Security (RLS) on all tables
+# Force redeploy Thu Sep 25 06:52:30 EDT 2025
