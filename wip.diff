@@ -1,0 +1,162 @@
+diff --git a/src/app/admin/login/LoginPageClient.tsx b/src/app/admin/login/LoginPageClient.tsx
+deleted file mode 100644
+index ca03d22..0000000
+--- a/src/app/admin/login/LoginPageClient.tsx
++++ /dev/null
+@@ -1,98 +0,0 @@
+-'use client';
+-
+-import { useState } from 'react';
+-import { useRouter } from 'next/navigation';
+-
+-/**
+- * Admin Login Client Component
+- * 
+- * Purpose: Client-side UI for admin authentication
+- * Security: Password stored in environment variable
+- */
+-
+-export default function LoginPageClient() {
+-  const [password, setPassword] = useState('');
+-  const [error, setError] = useState('');
+-  const [loading, setLoading] = useState(false);
+-  const router = useRouter();
+-
+-  const handleSubmit = async (e: React.FormEvent) => {
+-    e.preventDefault();
+-    setLoading(true);
+-    setError('');
+-
+-    try {
+-      const response = await fetch('/api/admin/login', {
+-        method: 'POST',
+-        headers: { 'Content-Type': 'application/json' },
+-        body: JSON.stringify({ password })
+-      });
+-
+-      if (response.ok) {
+-        const data = await response.json();
+-        if (data.ok) {
+-          // Successful login - redirect to admin send page
+-          router.push('/admin/send');
+-        } else {
+-          setError(data.message || 'Invalid password');
+-        }
+-      } else {
+-        const data = await response.json();
+-        setError(data.message || 'Invalid password');
+-      }
+-    } catch (err) {
+-      setError('Login failed. Please try again.');
+-    } finally {
+-      setLoading(false);
+-    }
+-  };
+-
+-  return (
+-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+-      <div className="max-w-md w-full space-y-8">
+-        <div>
+-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+-            Admin Login
+-          </h2>
+-          <p className="mt-2 text-center text-sm text-gray-600">
+-            Enter your admin password to access the management interface
+-          </p>
+-        </div>
+-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+-          <div>
+-            <label htmlFor="password" className="sr-only">
+-              Password
+-            </label>
+-            <input
+-              id="password"
+-              name="password"
+-              type="password"
+-              required
+-              autoComplete="current-password"
+-              className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+-              placeholder="Admin password"
+-              value={password}
+-              onChange={(e) => setPassword(e.target.value)}
+-            />
+-          </div>
+-
+-          {error && (
+-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+-              <p className="text-red-800 text-sm">{error}</p>
+-            </div>
+-          )}
+-
+-          <div>
+-            <button
+-              type="submit"
+-              disabled={loading}
+-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+-            >
+-              {loading ? 'Signing in...' : 'Sign in'}
+-            </button>
+-          </div>
+-        </form>
+-      </div>
+-    </div>
+-  );
+-}
+diff --git a/src/app/admin/login/page.tsx b/src/app/admin/login/page.tsx
+index cfb486e..688cec8 100644
+--- a/src/app/admin/login/page.tsx
++++ b/src/app/admin/login/page.tsx
+@@ -1,4 +1,3 @@
+-import { headers } from 'next/headers';
+ import LoginForm from './LoginForm';
+ 
+ export const dynamic = 'force-dynamic';
+@@ -6,7 +5,5 @@ export const revalidate = 0;
+ export const fetchCache = 'default-no-store';
+ 
+ export default function Page() {
+-  // Force dynamic at runtime; Next cannot prerender this page.
+-  headers();
+   return <LoginForm />;
+ }
+\ No newline at end of file
+diff --git a/src/app/api/admin/login/route.ts b/src/app/api/admin/login/route.ts
+index a79f842..586a34f 100644
+--- a/src/app/api/admin/login/route.ts
++++ b/src/app/api/admin/login/route.ts
+@@ -4,10 +4,15 @@ export const dynamic = 'force-dynamic';
+ export const revalidate = 0;
+ 
+ export async function POST(req: Request) {
+-  const { password } = await req.json();
++  const { password } = await req.json().catch(() => ({ password: '' }));
+   const ok = password === process.env.ADMIN_PASSWORD; // TODO: replace with real check
+   if (!ok) {
+-    return NextResponse.json({ ok: false, error: 'Invalid credentials' }, { status: 401 });
++    const res = NextResponse.json(
++      { ok: false, code: 'INVALID_PASSWORD', message: 'Invalid password' },
++      { status: 401 }
++    );
++    res.headers.set('X-Login-Handler', 'api-admin-login:invalid');
++    return res;
+   }
+   const res = NextResponse.json({ ok: true, message: 'Login successful' }, { status: 200 });
+   res.cookies.set('yff_admin', '1', {
+@@ -17,9 +22,15 @@ export async function POST(req: Request) {
+     path: '/',
+     maxAge: 60 * 60 * 8, // 8h
+   });
++  res.headers.set('X-Login-Handler', 'api-admin-login:success');
+   return res;
+ }
+ 
+ export async function GET() {
+-  return NextResponse.json({ ok: false, error: 'Method Not Allowed' }, { status: 405 });
++  const res = NextResponse.json(
++    { ok: false, code: 'METHOD_NOT_ALLOWED' },
++    { status: 405 }
++  );
++  res.headers.set('X-Login-Handler', 'api-admin-login:get-blocked');
++  return res;
+ }
+\ No newline at end of file

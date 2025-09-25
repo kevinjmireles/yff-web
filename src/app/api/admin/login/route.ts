@@ -4,10 +4,15 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function POST(req: Request) {
-  const { password } = await req.json();
+  const { password } = await req.json().catch(() => ({ password: '' }));
   const ok = password === process.env.ADMIN_PASSWORD; // TODO: replace with real check
   if (!ok) {
-    return NextResponse.json({ ok: false, error: 'Invalid credentials' }, { status: 401 });
+    const res = NextResponse.json(
+      { ok: false, code: 'INVALID_PASSWORD', message: 'Invalid password' },
+      { status: 401 }
+    );
+    res.headers.set('X-Login-Handler', 'api-admin-login:invalid');
+    return res;
   }
   const res = NextResponse.json({ ok: true, message: 'Login successful' }, { status: 200 });
   res.cookies.set('yff_admin', '1', {
@@ -17,9 +22,15 @@ export async function POST(req: Request) {
     path: '/',
     maxAge: 60 * 60 * 8, // 8h
   });
+  res.headers.set('X-Login-Handler', 'api-admin-login:success');
   return res;
 }
 
 export async function GET() {
-  return NextResponse.json({ ok: false, error: 'Method Not Allowed' }, { status: 405 });
+  const res = NextResponse.json(
+    { ok: false, code: 'METHOD_NOT_ALLOWED' },
+    { status: 405 }
+  );
+  res.headers.set('X-Login-Handler', 'api-admin-login:get-blocked');
+  return res;
 }
