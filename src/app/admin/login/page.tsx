@@ -29,7 +29,13 @@ export default function AdminLoginPage() {
       });
 
       if (response.ok) {
-        router.push('/admin/send');
+        const data = await response.json();
+        if (data.ok) {
+          // Successful login - redirect to admin send page
+          router.push('/admin/send');
+        } else {
+          setError(data.message || 'Invalid password');
+        }
       } else {
         const data = await response.json();
         setError(data.message || 'Invalid password');

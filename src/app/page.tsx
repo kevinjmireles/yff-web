@@ -206,7 +206,7 @@ export default function Home() {
         {/* Header with Logo */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Image src="/Fido_Logo.png" alt="Your Friend Fido" width={200} height={80} className="h-20 w-auto" priority />
+            <Image src="/Fido_Logo.png" alt="Your Friend Fido" width={200} height={80} className="h-20 w-auto" style={{ width: 'auto', height: 'auto' }} priority />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Tired of reading the news and still not knowing how it affects you?</h1>
           <div className="text-xl text-gray-600 mb-6 max-w-2xl mx-auto">

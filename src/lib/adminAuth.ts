@@ -52,6 +52,25 @@ export function setAdminCookie(request?: NextRequest): NextResponse {
 }
 
 /**
+ * Set admin authentication cookie with JSON response
+ */
+export function setAdminCookieJson(): NextResponse {
+  const response = NextResponse.json({
+    ok: true,
+    message: 'Login successful',
+    redirect: '/admin/send'
+  });
+  response.cookies.set(ADMIN_COOKIE_NAME, ADMIN_COOKIE_VALUE, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: COOKIE_MAX_AGE,
+    path: '/',
+    sameSite: 'strict',
+  });
+  return response;
+}
+
+/**
  * Clear admin authentication cookie
  */
 export function clearAdminCookie(request?: NextRequest): NextResponse {

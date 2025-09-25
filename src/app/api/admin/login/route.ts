@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { verifyAdminPassword, setAdminCookie } from '@/lib/adminAuth';
+import { verifyAdminPassword, setAdminCookieJson } from '@/lib/adminAuth';
 import { isFeatureEnabled } from '@/lib/features';
 
 const loginSchema = z.object({
@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Set admin cookie and redirect
-    return setAdminCookie(request);
+    // Set admin cookie and return JSON response
+    return setAdminCookieJson();
 
   } catch (error) {
     if (error instanceof z.ZodError) {
