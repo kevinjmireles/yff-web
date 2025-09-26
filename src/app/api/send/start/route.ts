@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isFeatureEnabled } from '@/lib/features';
 import { requireAdmin } from '@/lib/auth';
+import { jsonErrorWithId } from '@/lib/api';
 
 const startJobSchema = z.object({
   dataset_id: z.string().uuid('Invalid dataset ID format'),
@@ -24,14 +25,7 @@ export async function POST(request: NextRequest) {
     if (unauthorized) return unauthorized;
     // Feature flag check
     if (!isFeatureEnabled('sendRun')) {
-      return NextResponse.json(
-        { 
-          ok: false, 
-          code: 'FEATURE_DISABLED', 
-          message: 'Send functionality is currently disabled' 
-        },
-        { status: 503 }
-      );
+      return jsonErrorWithId(request, 'FEATURE_DISABLED', 'Send functionality is currently disabled', 503);
     }
 
     // TODO: Add admin authentication check here
@@ -48,14 +42,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (datasetError || !dataset) {
-      return NextResponse.json(
-        { 
-          ok: false, 
-          code: 'DATASET_NOT_FOUND', 
-          message: 'Dataset not found' 
-        },
-        { status: 404 }
-      );
+      return jsonErrorWithId(request, 'DATASET_NOT_FOUND', 'Dataset not found', 404);
     }
 
     // Create new send job
@@ -72,15 +59,7 @@ export async function POST(request: NextRequest) {
 
     if (jobError) {
       console.error('Create send job error:', jobError);
-      return NextResponse.json(
-        { 
-          ok: false, 
-          code: 'JOB_CREATE_ERROR', 
-          message: 'Failed to create send job',
-          details: jobError.message 
-        },
-        { status: 500 }
-      );
+      return jsonErrorWithId(request, 'JOB_CREATE_ERROR', 'Failed to create send job', 500, jobError.message);
     }
 
     return NextResponse.json({
@@ -95,25 +74,10 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { 
-          ok: false, 
-          code: 'VALIDATION_ERROR', 
-          message: 'Invalid input data',
-          details: error.errors 
-        },
-        { status: 400 }
-      );
+      return jsonErrorWithId(request, 'VALIDATION_ERROR', 'Invalid input data', 400, error.errors);
     }
 
     console.error('Send start API error:', error);
-    return NextResponse.json(
-      { 
-        ok: false, 
-        code: 'INTERNAL_ERROR', 
-        message: 'Internal server error' 
-      },
-      { status: 500 }
-    );
+    return jsonErrorWithId(request, 'INTERNAL_ERROR', 'Internal server error', 500);
   }
 }

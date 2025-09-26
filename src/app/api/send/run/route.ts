@@ -12,6 +12,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { parseAudienceRule, executeAudienceRule } from '@/lib/audienceRule';
 import { isFeatureEnabled } from '@/lib/features';
 import { requireAdmin } from '@/lib/auth';
+import { jsonErrorWithId } from '@/lib/api';
 
 const runJobSchema = z.object({
   job_id: z.string().uuid('Invalid job ID format').optional(),
@@ -27,14 +28,7 @@ export async function POST(request: NextRequest) {
     if (unauthorized) return unauthorized;
     // Feature flag check
     if (!isFeatureEnabled('sendRun')) {
-      return NextResponse.json(
-        { 
-          ok: false, 
-          code: 'FEATURE_DISABLED', 
-          message: 'Send functionality is currently disabled' 
-        },
-        { status: 503 }
-      );
+      return jsonErrorWithId(request, 'FEATURE_DISABLED', 'Send functionality is currently disabled', 503);
     }
 
     // TODO: Add admin authentication check here
@@ -123,26 +117,11 @@ export async function POST(request: NextRequest) {
 
     if (contentError) {
       console.error('Get content items error:', contentError);
-      return NextResponse.json(
-        { 
-          ok: false, 
-          code: 'CONTENT_ERROR', 
-          message: 'Failed to get content items',
-          details: contentError.message 
-        },
-        { status: 500 }
-      );
+      return jsonErrorWithId(request, 'CONTENT_ERROR', 'Failed to get content items', 500, contentError.message);
     }
 
     if (!contentItems || contentItems.length === 0) {
-      return NextResponse.json(
-        { 
-          ok: false, 
-          code: 'NO_CONTENT', 
-          message: 'No content items found for dataset' 
-        },
-        { status: 404 }
-      );
+      return jsonErrorWithId(request, 'NO_CONTENT', 'No content items found for dataset', 404);
     }
 
     // Process each content item
@@ -268,25 +247,10 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { 
-          ok: false, 
-          code: 'VALIDATION_ERROR', 
-          message: 'Invalid input data',
-          details: error.errors 
-        },
-        { status: 400 }
-      );
+      return jsonErrorWithId(request, 'VALIDATION_ERROR', 'Invalid input data', 400, error.errors);
     }
 
     console.error('Send run API error:', error);
-    return NextResponse.json(
-      { 
-        ok: false, 
-        code: 'INTERNAL_ERROR', 
-        message: 'Internal server error' 
-      },
-      { status: 500 }
-    );
+    return jsonErrorWithId(request, 'INTERNAL_ERROR', 'Internal server error', 500);
   }
 }
