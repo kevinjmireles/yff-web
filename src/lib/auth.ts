@@ -1,11 +1,18 @@
-// Purpose: Minimal admin gate helpers. Extend later if needed.
-// Called by: /app/admin/* routes, server components.
+// Purpose: Minimal admin cookie gate helpers for API and middleware.
+// Called by: /app/admin/* routes, server components, middleware, APIs.
 
-export function isAdminEmail(email?: string | null) {
-  // Smallest placeholder. Replace with a real rule or RLS-backed check later.
-  const allowList = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
-    .split(',')
-    .map(s => s.trim().toLowerCase())
-    .filter(Boolean)
-  return !!email && allowList.includes(email.toLowerCase())
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
+
+export function isAdminCookiePresent(req: NextRequest): boolean {
+  // Admin login sets yff_admin=1; secure, httpOnly, lax
+  return req.cookies.get('yff_admin')?.value === '1'
+}
+
+export function requireAdmin(req: NextRequest): NextResponse | null {
+  if (isAdminCookiePresent(req)) return null
+  return new NextResponse(
+    JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Unauthorized' }),
+    { status: 401, headers: { 'content-type': 'application/json' } }
+  )
 }

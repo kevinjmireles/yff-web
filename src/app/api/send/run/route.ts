@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { parseAudienceRule, executeAudienceRule } from '@/lib/audienceRule';
 import { isFeatureEnabled } from '@/lib/features';
+import { requireAdmin } from '@/lib/auth';
 
 const runJobSchema = z.object({
   job_id: z.string().uuid('Invalid job ID format').optional(),
@@ -21,6 +22,9 @@ const BATCH_LIMIT = 200;
 
 export async function POST(request: NextRequest) {
   try {
+    // Admin auth guard
+    const unauthorized = requireAdmin(request);
+    if (unauthorized) return unauthorized;
     // Feature flag check
     if (!isFeatureEnabled('sendRun')) {
       return NextResponse.json(
