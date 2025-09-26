@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isFeatureEnabled } from '@/lib/features';
+import { requireAdmin } from '@/lib/auth';
 
 const startJobSchema = z.object({
   dataset_id: z.string().uuid('Invalid dataset ID format'),
@@ -18,6 +19,9 @@ const startJobSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Admin auth guard
+    const unauthorized = requireAdmin(request);
+    if (unauthorized) return unauthorized;
     // Feature flag check
     if (!isFeatureEnabled('sendRun')) {
       return NextResponse.json(
