@@ -7,16 +7,14 @@ export const config = {
 
 export default function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  console.log('🔍 Middleware running for:', pathname);
 
   const isAdminUI  = pathname.startsWith('/admin/');
   const isAdminAPI = pathname.startsWith('/api/admin/');
   const isSendAPI  = pathname.startsWith('/api/send/');
 
-  // TEMP: allow login UI + login2 UI and login API to pass without auth
+  // Allow login UI and login API to pass without auth
   if (
     pathname === '/admin/login' ||
-    pathname === '/admin/login2' || // TEMP for header checks
     pathname === '/api/admin/login'
   ) {
     return NextResponse.next();
