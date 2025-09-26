@@ -7,6 +7,8 @@ export const config = {
 
 export default function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const existingReqId = req.headers.get('x-request-id') || req.headers.get('x-correlation-id');
+  const requestId = existingReqId || crypto.randomUUID();
 
   const isAdminUI  = pathname.startsWith('/admin/');
   const isAdminAPI = pathname.startsWith('/api/admin/');
@@ -17,7 +19,9 @@ export default function middleware(req: NextRequest) {
     pathname === '/admin/login' ||
     pathname === '/api/admin/login'
   ) {
-    return NextResponse.next();
+    const res = NextResponse.next();
+    res.headers.set('X-Request-Id', requestId);
+    return res;
   }
 
   const isAuthed = req.cookies.get('yff_admin')?.value === '1';
@@ -27,16 +31,20 @@ export default function middleware(req: NextRequest) {
     const url = req.nextUrl.clone();
     url.pathname = '/admin/login';
     url.searchParams.set('next', pathname);
-    return NextResponse.redirect(url);
+    const res = NextResponse.redirect(url);
+    res.headers.set('X-Request-Id', requestId);
+    return res;
   }
 
   // Protect APIs: return 401 JSON when not authed (no redirects)
   if ((isAdminAPI || isSendAPI) && !isAuthed) {
-    return new NextResponse(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
+    return new NextResponse(JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Unauthorized', requestId }), {
       status: 401,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'X-Request-Id': requestId },
     });
   }
 
-  return NextResponse.next();
+  const res = NextResponse.next();
+  res.headers.set('X-Request-Id', requestId);
+  return res;
 }
