@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
+import { getEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function POST(req: Request) {
   const { password } = await req.json().catch(() => ({ password: '' }));
-  const ok = password === process.env.ADMIN_PASSWORD; // TODO: replace with real check
+  const ok = password === getEnv().ADMIN_PASSWORD;
   if (!ok) {
     const res = NextResponse.json(
       { ok: false, code: 'INVALID_PASSWORD', message: 'Invalid password' },
