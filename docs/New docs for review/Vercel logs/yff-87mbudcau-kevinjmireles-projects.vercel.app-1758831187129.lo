@@ -1,9 +1,0 @@
-login:1 [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) <form class=​"mt-8 space-y-6">​…​</form>​
-23ef6676464becae.js:1  POST https://yff-87mbudcau-kevinjmireles-projects.vercel.app/api/admin/login 401 (Unauthorized)
-n @ 23ef6676464becae.js:1
-i2 @ a902a6d01888e473.js:1
-(anonymous) @ a902a6d01888e473.js:1
-tS @ a902a6d01888e473.js:1
-i9 @ a902a6d01888e473.js:1
-cu @ a902a6d01888e473.js:1
-ca @ a902a6d01888e473.js:1

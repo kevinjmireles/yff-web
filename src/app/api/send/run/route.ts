@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
           totals.fallback_used++;
         }
 
-        // Insert delivery attempts for matched users
+        // Insert delivery attempts for matched users (idempotent)
         if (userIds.length > 0) {
           const deliveryAttempts = userIds.map(userId => ({
             send_job_id: job.id,
@@ -211,15 +211,23 @@ export async function POST(request: NextRequest) {
             status: 'preview' as const
           }));
 
-          const { error: insertError } = await supabaseAdmin
+          // Use upsert with ignoreDuplicates to treat unique violations as success
+          const { data: upserted, error: upsertError } = await supabaseAdmin
             .from('delivery_attempts')
-            .insert(deliveryAttempts);
+            .upsert(deliveryAttempts, {
+              onConflict: 'user_id,content_item_id',
+              ignoreDuplicates: true,
+            })
+            .select('user_id');
 
-          if (insertError) {
-            console.error('Insert delivery attempts error:', insertError);
+          if (upsertError) {
+            console.error('Upsert delivery attempts error:', upsertError);
             // Continue processing other items
-          } else {
-            totals.inserted += deliveryAttempts.length;
+          }
+
+          // Count only rows actually inserted/updated (duplicates ignored)
+          if (Array.isArray(upserted)) {
+            totals.inserted += upserted.length;
           }
         }
 
