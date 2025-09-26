@@ -44,10 +44,19 @@ export default function middleware(req: NextRequest) {
   const testAccessRequired = process.env.TEST_ACCESS_TOKEN || '';
 
   // Allowlist helper and health endpoints (enables setting test_access cookie in prod)
-  const isHelperRoute = pathname.startsWith('/api/test-auth') || pathname.startsWith('/api/echo-ip') || pathname.startsWith('/api/health');
-  if (!(enforceProdOnly && isProd) || isHelperRoute) {
-    // Skip enforcement (not prod or helper/health)
-  } else {
+  const isHelperRoute =
+    pathname.startsWith('/api/test-auth') ||
+    pathname.startsWith('/api/echo-ip') ||
+    pathname.startsWith('/api/health');
+
+  // Restrict gate scope to admin UI and admin/send APIs only (do not gate public APIs)
+  const isGateTarget =
+    (pathname.startsWith('/admin/') ||
+      pathname.startsWith('/api/admin/') ||
+      pathname.startsWith('/api/send/')) &&
+    !isHelperRoute;
+
+  if (enforceProdOnly && isProd && isGateTarget) {
     const headerToken = req.headers.get('x-test-access') || '';
     const cookieToken = req.cookies.get('test_access')?.value || '';
     const token = headerToken || cookieToken;
