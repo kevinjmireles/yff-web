@@ -50,11 +50,14 @@ export default function middleware(req: NextRequest) {
     pathname.startsWith('/api/health');
 
   // Restrict gate scope to admin UI and admin/send APIs only (do not gate public APIs)
+  // Exclude the login UI and login API so users can obtain a session
   const isGateTarget =
     (pathname.startsWith('/admin/') ||
       pathname.startsWith('/api/admin/') ||
       pathname.startsWith('/api/send/')) &&
-    !isHelperRoute;
+    !isHelperRoute &&
+    pathname !== '/admin/login' &&
+    pathname !== '/api/admin/login';
 
   if (enforceProdOnly && isProd && isGateTarget) {
     const headerToken = req.headers.get('x-test-access') || '';
