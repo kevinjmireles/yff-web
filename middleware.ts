@@ -2,13 +2,62 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export const config = {
-  matcher: ['/admin/:path*', '/api/admin/:path*', '/api/send/:path*'],
+  // Protect admin UI and all APIs so we can enforce test-access gate in prod
+  matcher: ['/admin/:path*', '/api/:path*'],
 };
 
 export default function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const existingReqId = req.headers.get('x-request-id') || req.headers.get('x-correlation-id');
   const requestId = existingReqId || crypto.randomUUID();
+
+  // ---------- Test Access Gate (prod-only by default) ----------
+  // Allow assets and Next internals quickly
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/favicon') ||
+    pathname.startsWith('/public') ||
+    pathname.startsWith('/assets')
+  ) {
+    const res = NextResponse.next();
+    res.headers.set('X-Request-Id', requestId);
+    return res;
+  }
+
+  // Only guard our matchers; early return otherwise (defensive)
+  const isProtected = pathname.startsWith('/admin') || pathname.startsWith('/api');
+  if (!isProtected) {
+    const res = NextResponse.next();
+    res.headers.set('X-Request-Id', requestId);
+    return res;
+  }
+
+  if (req.method === 'OPTIONS') {
+    const res = NextResponse.next();
+    res.headers.set('X-Request-Id', requestId);
+    return res;
+  }
+
+  // Do not enforce outside production when enabled
+  const enforceProdOnly = (process.env.TEST_ACCESS_ENFORCE_PROD_ONLY ?? 'true') === 'true';
+  const isProd = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
+  const testAccessRequired = process.env.TEST_ACCESS_TOKEN || '';
+
+  // Allowlist helper and health endpoints
+  const isHelperRoute = pathname.startsWith('/api/test-auth') || pathname.startsWith('/api/echo-ip') || pathname.startsWith('/api/health');
+  if (!(enforceProdOnly && isProd) || isHelperRoute) {
+    // Skip enforcement (not prod or helper/health)
+  } else {
+    const headerToken = req.headers.get('x-test-access') || '';
+    const cookieToken = req.cookies.get('test_access')?.value || '';
+    const token = headerToken || cookieToken;
+    if (testAccessRequired && token !== testAccessRequired) {
+      return new NextResponse('Forbidden', {
+        status: 403,
+        headers: { 'x-test-access': 'denied', 'X-Request-Id': requestId },
+      });
+    }
+  }
 
   const isAdminUI  = pathname.startsWith('/admin/');
   const isAdminAPI = pathname.startsWith('/api/admin/');
