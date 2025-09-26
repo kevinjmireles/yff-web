@@ -43,7 +43,7 @@ export default function middleware(req: NextRequest) {
   const isProd = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
   const testAccessRequired = process.env.TEST_ACCESS_TOKEN || '';
 
-  // Allowlist helper and health endpoints
+  // Allowlist helper and health endpoints (enables setting test_access cookie in prod)
   const isHelperRoute = pathname.startsWith('/api/test-auth') || pathname.startsWith('/api/echo-ip') || pathname.startsWith('/api/health');
   if (!(enforceProdOnly && isProd) || isHelperRoute) {
     // Skip enforcement (not prod or helper/health)
