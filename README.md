@@ -22,6 +22,9 @@ This repo sends **personalized civic newsletters**. Editors write **one article*
 - ZIP Explainer: `ZIP_Personalization_Explainer.md`
 - ZIP Step-by-Step: `ZIP_Personalization_Step_by_Step.md`
 
+## Runbooks
+- Incident triage: `docs/runbooks/incident-triage.md`
+
 ## Migrations & Policies
 - Schema migration (idempotent): `schema_migration_v2_1.sql`
 - DB Migration Checklist: `db_migration_checklist.md`
