@@ -54,6 +54,28 @@ Common Causes and Fixes
 - Stale page (x-nextjs-prerender: 1): Ensure admin pages are dynamic (`dynamic='force-dynamic'`, `revalidate=0`).
 - 403 from Vercel: Security Checkpoint blocking scripted requests. Test via browser; allowlist IP/UA for CI.
 
+Test Access Gate (for automated Prod tests)
+```text
+Purpose: Temporarily allow automation to reach admin/send routes in Production without real user sessions.
+
+How it works
+- Gate applies only to: /admin/*, /api/admin/*, /api/send/*
+- Login endpoints are excluded: /admin/login, /api/admin/login
+- Helper routes always allowed: /api/test-auth, /api/echo-ip, /api/health
+
+Enable
+1) Set TEST_ACCESS_TOKEN in Vercel (Production), redeploy.
+2) Browser: open $BASE/api/test-auth?token=<TOKEN> (sets test_access cookie).
+   CLI/bot: add header  x-test-access: <TOKEN>  on admin/send requests.
+
+Disable
+- Unset TEST_ACCESS_TOKEN and redeploy (gate OFF).
+
+Notes
+- TEST_ACCESS_ENFORCE_PROD_ONLY=true means gate only enforces in Production; Preview/Dev are unaffected.
+- Remove the token when testing is done to avoid surprises.
+```
+
 When escalating
 - Capture: endpoint, status, full headers, body, and requestId.
 - Search logs by requestId in Vercel to correlate events.
