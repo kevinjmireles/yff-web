@@ -1,3 +1,11 @@
+/**
+ * Purpose: Global middleware for request-id injection, production-only test-access gate,
+ * and admin auth enforcement for UI and APIs.
+ *
+ * Protects: '/admin/*', '/api/admin/*', '/api/send/*'
+ * Excludes: '/admin/login', '/api/admin/login'
+ * Allowlist: '/api/test-auth', '/api/echo-ip', '/api/health'
+ */
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
