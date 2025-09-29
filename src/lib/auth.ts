@@ -1,5 +1,9 @@
-// Purpose: Minimal admin cookie gate helpers for API and middleware.
-// Called by: /app/admin/* routes, server components, middleware, APIs.
+/**
+ * Purpose: Minimal admin cookie gate helpers used by APIs and middleware.
+ *
+ * Called by: `/app/admin/*` routes, server components, middleware, APIs.
+ * Exports: isAdminCookiePresent, requireAdmin
+ */
 
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
