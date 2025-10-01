@@ -4,9 +4,14 @@
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  return NextResponse.json({
-    ok: true,
-    service: 'yff-web',
-    timestamp: new Date().toISOString(),
-  })
+  return NextResponse.json(
+    {
+      ok: true,
+      service: 'yff-web',
+      timestamp: new Date().toISOString(),
+    },
+    {
+      headers: { 'Cache-Control': 'no-store' }
+    }
+  )
 }
