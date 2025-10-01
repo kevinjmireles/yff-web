@@ -1,0 +1,32 @@
+Category,Name,Purpose
+File,YFF-MVP-Roadmap-v2.1.md,High-level MVP roadmap v2.1
+File,yff-v2.1-04-overall-plan.md,Overall plan for v2.1
+File,yff-v2-03-send.md,Send functionality (v2)
+File,yff-v2.1-03-send.md,Send functionality (v2.1 refinements)
+File,yff-v2.1-02-content-import.md,Content import workflow
+File,yff-v2.1-01-signup.md,Signup workflow
+File,yff_decommission_supabase_edge_functions_migration_pack.md,Plan to remove Supabase Edge Functions
+File,prd.md,Product requirements document
+File,requirements.md,Functional requirements
+File,handoff.md,Dev/ops handoff guide
+File,post_merge_edge_validation.md,Validation checklist after merge
+File,post_deploy_edge_check.md,Validation checklist after deploy
+File,data_dictionary.md,Database data dictionary
+File,table_inventory.csv,Supabase table inventory
+File,ENVIRONMENT_SETUP.md,Environment setup instructions
+File,README.md,Repo readme
+File,legal_compliance.md,Legal and compliance notes
+File,YFF-48-Hour-Launch-Plan.md,Short sprint launch plan
+Conversation,MVP Work Remaining (2025-09-22),"Token usage, dataset promotion questions"
+Conversation,Edge Functions Audit (2025-09-22),Identified profile-address as only active EF
+Conversation,Stabilize Code & Workflow (2025-09-22),"Branching strategy, starter kit update"
+Conversation,Vercel Deployment Issues (2025-09-25),"Admin login redirect fix, Canary headers"
+Conversation,Send Functionality (2025-09-19),"API endpoints and job flow, missing login + tracking"
+Conversation,Data Sources for Fido Emails (2025-09-27),Potential geo datasets for personalization
+Conversation,Table Dictionary CSV (2025-09-26),Mapped Supabase schema active vs backup
+Conversation,Vercel IP Allowlist Setup (2025-09-26),Decision on allowlist for Cursor testing
+Conversation,Security Definer View (2025-09-22),Supabase lint errors around v_subscriber_geo
+Priority,48-Hour Launch Plan,"Send jobs, dedup, callback, signup polish, env caps"
+Priority,Edge Function Removal,"Simplify infra, move enrichment to API/Make"
+Priority,Token Upload + Replacement,"Advanced personalization, phase after launch"
+Priority,Admin Login Hardening,"JSON-only, Canary headers, /admin/health check"

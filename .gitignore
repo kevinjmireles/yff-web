@@ -49,3 +49,11 @@ next-env.d.ts
 # Supabase CLI temp files
 supabase/.temp/
 .env*.local
+
+# Debug scratch (do not commit)
+docs/_scratch/
+*.log
+*.trace
+*.har
+*.zip
+*.tgz
