@@ -262,4 +262,7 @@ This way Make only calls **your** API; you can batch, validate, and log consiste
 
 ---
 
-This blueprint eliminates the ‘Make mystery’ by keeping the logic explicit, with a local escape hatch and crisp contracts. Paste this into the repo under `docs/ingest/README.md` so any agent can follow it 1:1.
+This blueprint eliminates the ‘Make mystery’ by keeping the logic explicit, with a local escape hatch and crisp contracts.
+
+Related docs:
+- Content import contract: `docs/ingest/content-import-contract.md`

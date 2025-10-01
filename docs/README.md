@@ -1,3 +1,15 @@
+# Docs
+
+This folder contains developer and operator documentation.
+
+## Sections
+- Guides: `docs/guides/`
+- API Guides: `docs/guides/api/`
+- Ingest: `docs/ingest/`
+- Migrations: `docs/migrations/`
+- Runbooks: `docs/runbooks/`
+- Troubleshooting: `docs/troubleshooting/`
+
 # Documentation Index
 
 Welcome to the Your Friend Fido documentation. Everything you need to build, run, and maintain the system is organized here.
