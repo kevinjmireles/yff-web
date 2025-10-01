@@ -73,6 +73,7 @@ This repo sends **personalized civic newsletters**. Editors write **one article*
 
 Notes:
 - Leave `TEST_ACCESS_TOKEN` unset in Production for normal operation. Set it temporarily only when you need automated tests against Production; then unset again.
+- Admin login uses `ADMIN_PASSWORD`. In development, set it in `.env.local` and restart the dev server. Example: `ADMIN_PASSWORD=admin123 pnpm dev`.
 
 ## Developer Testing Snippets
 

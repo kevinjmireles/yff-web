@@ -55,4 +55,38 @@ File: `middleware.ts`
 - `src/app/api/test-auth/route.ts` — sets `test_access` cookie for browser tests
 - `src/app/api/echo-ip/route.ts` — IP debugging
 
+---
+
+## Feature Flags
+
+Feature flags control access to new or experimental functionality in the application.
+
+**Canonical import:** `@/lib/features`
+```typescript
+import { isFeatureEnabled } from '@/lib/features'
+```
+
+**Compatibility shim:** `@/lib/flags` re-exports from `@/lib/features` for legacy compatibility.
+
+**Usage:**
+```typescript
+if (isFeatureEnabled('contentPromote')) {
+  // Feature-gated code
+}
+```
+
+**Available flags:**
+- `adminSend` - Admin send functionality (default: ON)
+- `adminAuth` - Admin authentication (default: ON)
+- `sendRun` - Send job execution (default: ON)
+- `sendPreview` - Send preview generation (default: ON)
+- `contentPromote` - Content promotion from staging (default: ON)
+- `debugMode` - Debug mode (auto: development only)
+- `verboseLogging` - Verbose logging (env: VERBOSE_LOGGING=1)
+
+**Configuration:** 
+- Set via environment variables with `FEATURE_` prefix
+- Use `0` to disable (e.g., `FEATURE_SEND_RUN=0`)
+- Default is ON for all admin/send/content features
+
 

@@ -8,6 +8,7 @@
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_URL=your_supabase_project_url
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 # Google Civic API (Server-side only) - REQUIRED for address enrichment
@@ -18,9 +19,12 @@ CIVIC_API_KEY=your_google_civic_api_key
 NEXT_PUBLIC_BASE_URL=https://your-domain.vercel.app
 NEXT_PUBLIC_ADMIN_EMAILS=your-email@example.com
 
-# Feature Flags
-FEATURE_DELEGATION_TOKENS=false
-FEATURE_ADMIN_IMPORTS=false
+# Feature Flags (defaults to ON, use =0 to disable)
+FEATURE_ADMIN_SEND=1
+FEATURE_ADMIN_AUTH=1
+FEATURE_SEND_RUN=1
+FEATURE_SEND_PREVIEW=1
+FEATURE_CONTENT_PROMOTE=1
 
 # reCAPTCHA Configuration
 NEXT_PUBLIC_RECAPTCHA_SITE_KEY=your_recaptcha_site_key
@@ -40,6 +44,7 @@ NEXT_PUBLIC_MAKE_WEBHOOK_URL=your_make_webhook_url
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 
 # Google Civic API (Required for address enrichment testing)
@@ -49,9 +54,12 @@ CIVIC_API_KEY=
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 NEXT_PUBLIC_ADMIN_EMAILS=you@example.com
 
-# Feature Flags
-FEATURE_DELEGATION_TOKENS=false
-FEATURE_ADMIN_IMPORTS=false
+# Feature Flags (defaults to ON, use =0 to disable)
+FEATURE_ADMIN_SEND=1
+FEATURE_ADMIN_AUTH=1
+FEATURE_SEND_RUN=1
+FEATURE_SEND_PREVIEW=1
+FEATURE_CONTENT_PROMOTE=1
 
 # reCAPTCHA Configuration (Optional in dev)
 NEXT_PUBLIC_RECAPTCHA_SITE_KEY=
@@ -63,6 +71,30 @@ EDGE_SHARED_SECRET=
 # Make.com Webhook (Optional in dev)
 NEXT_PUBLIC_MAKE_WEBHOOK_URL=
 ```
+
+## 🔐 **Admin & Security Configuration:**
+
+```bash
+# Admin Password Authentication (optional)
+ADMIN_PASSWORD=your_secure_password
+
+# Test Access Tokens (for automated testing in production)
+# Leave UNSET in production for normal operation
+# Set only when running controlled production tests, then unset after
+TEST_ACCESS_TOKEN=your_test_token
+TEST_ACCESS_ENFORCE_PROD_ONLY=true
+
+# Email Unsubscribe HMAC Secret (used by Edge Functions)
+UNSUB_SECRET=your_secure_signing_secret_min_32_chars
+```
+
+### **Security Notes:**
+- ✅ **ADMIN_PASSWORD** should be a strong password for admin login
+- ✅ In development, set **ADMIN_PASSWORD** in `.env.local` and restart the dev server. Example: `ADMIN_PASSWORD=admin123 pnpm dev`
+- ✅ **TEST_ACCESS_TOKEN** should only be set temporarily for production testing
+- ✅ **TEST_ACCESS_ENFORCE_PROD_ONLY** default is `true` (only enforced in production)
+- ✅ **UNSUB_SECRET** must be at least 32 characters for HMAC security
+- ✅ **SUPABASE_URL** needed for server-side admin client (same as NEXT_PUBLIC_SUPABASE_URL)
 
 ## 🔧 **Setup Instructions:**
 
