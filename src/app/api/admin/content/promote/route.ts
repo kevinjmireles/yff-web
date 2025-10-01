@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isFeatureEnabled } from '@/lib/features';
+import { requireAdmin } from '@/lib/auth';
 
 const promoteSchema = z.object({
   dataset_id: z.string().uuid('Invalid dataset ID format'),
@@ -17,6 +18,10 @@ const promoteSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Admin auth guard
+    const unauthorized = requireAdmin(request);
+    if (unauthorized) return unauthorized;
+    
     // Feature flag check
     if (!isFeatureEnabled('contentPromote')) {
       return NextResponse.json(
@@ -28,9 +33,6 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       );
     }
-
-    // TODO: Add admin authentication check here
-    // For now, we'll implement the core functionality
     
     const body = await request.json();
     const { dataset_id } = promoteSchema.parse(body);
