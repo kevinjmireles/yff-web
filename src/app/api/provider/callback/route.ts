@@ -58,12 +58,12 @@ export async function POST(req: NextRequest) {
     const meta = r.error ? { error: r.error } : (r as any).meta ?? null
 
     if (r.provider_message_id) {
-      // Keep provider_message_id upsert path (idempotent by provider id)
+      // Upsert by provider_message_id; allow update to status/meta when exists
       const { error } = await sb
         .from('delivery_history')
         .upsert(
           [{ provider_message_id: r.provider_message_id, job_id, batch_id, email, status: r.status, meta }],
-          { onConflict: 'provider_message_id', ignoreDuplicates: true }
+          { onConflict: 'provider_message_id' }
         )
       if (error) return jsonErrorWithId(req, 'INSERT_ERROR', error.message, 500)
       continue
