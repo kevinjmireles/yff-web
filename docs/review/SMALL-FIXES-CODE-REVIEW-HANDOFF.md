@@ -21,13 +21,13 @@ This PR implements critical fixes for test-auth cookie semantics, adds admin gua
 
 Please review these files in order:
 
-1. **`docs/review/PR-REVIEW-SMALL-FIXES.md`** - Complete PR review package with:
+1. **`docs/review/SMALL-FIXES-PR-REVIEW.md`** - Complete PR review package with:
    - Detailed changes breakdown
    - Test cases for each change
    - Security impact analysis
    - Acceptance criteria checklist
 
-2. **`docs/review/IMPLEMENTATION-SUMMARY.md`** - Implementation summary with:
+2. **`docs/review/SMALL-FIXES-IMPLEMENTATION.md`** - Implementation summary with:
    - Smoke test results
    - Build verification
    - Changed files summary
@@ -201,7 +201,7 @@ $ pnpm build
 
 ## 📝 Suggested Review Process
 
-1. **Read** `docs/review/PR-REVIEW-SMALL-FIXES.md` (10 min)
+1. **Read** `docs/review/SMALL-FIXES-PR-REVIEW.md` (10 min)
 2. **Review** each modified file (5 min per file)
 3. **Verify** acceptance criteria (5 min)
 4. **Check** security implications (5 min)

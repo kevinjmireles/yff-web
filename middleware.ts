@@ -101,19 +101,35 @@ export default function middleware(req: NextRequest) {
     url.pathname = '/admin/login';
     url.searchParams.set('next', pathname);
     const res = NextResponse.redirect(url);
+    res.headers.set('Cache-Control', 'no-store');
     res.headers.set('X-Request-Id', requestId);
     return res;
   }
 
-  // Protect APIs: return 401 JSON when not authed (no redirects)
-  if ((isAdminAPI || isSendAPI) && !isAuthed) {
-    return new NextResponse(JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Unauthorized', requestId }), {
-      status: 401,
-      headers: { 'content-type': 'application/json', 'X-Request-Id': requestId },
-    });
+  // Bearer admin token support (defense-in-depth for CI/bots)
+  if (isAdminAPI || isSendAPI) {
+    const authHeader = req.headers.get('authorization') || req.headers.get('x-admin-token') || ''
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader
+    const tokenOk = !!(bearer && process.env.ADMIN_API_TOKEN && bearer === process.env.ADMIN_API_TOKEN)
+    if (!isAuthed && !tokenOk) {
+      const res = new NextResponse(
+        JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Unauthorized', requestId }),
+        { status: 401 }
+      )
+      res.headers.set('content-type', 'application/json')
+      res.headers.set('X-Request-Id', requestId)
+      res.headers.set('Cache-Control', 'no-store')
+      return res
+    }
+    // Auth accepted → continue, ensuring observability headers
+    const res = NextResponse.next()
+    res.headers.set('X-Request-Id', requestId)
+    res.headers.set('Cache-Control', 'no-store')
+    return res
   }
 
   const res = NextResponse.next();
+  res.headers.set('Cache-Control', 'no-store');
   res.headers.set('X-Request-Id', requestId);
   return res;
 }

@@ -38,3 +38,13 @@ export function getFeatureStatus() {
     return acc;
   }, {} as Record<string, boolean>);
 }
+
+// Send execution flags (MVP)
+export const FEATURE_SEND_EXECUTE =
+  process.env.FEATURE_SEND_EXECUTE !== '0';
+export const FEATURE_TEST_SEND =
+  process.env.FEATURE_TEST_SEND === 'on';
+export const FEATURE_FULL_SEND =
+  process.env.FEATURE_FULL_SEND === 'on';
+export const MAX_SEND_PER_RUN =
+  parseInt(process.env.MAX_SEND_PER_RUN ?? '100');

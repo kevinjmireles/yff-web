@@ -3,6 +3,10 @@
 
 This repo sends **personalized civic newsletters**. Editors write **one article**, and recipients get local context via tokens (ZIP + delegation).
 
+## For AI Assistants
+
+📘 **[Read CLAUDE.md first](docs/meta/CLAUDE.md)** - Development guidelines and codebase orientation
+
 ## Quick Start
 1. **Author an article** (row = complete email) → export CSV.  
 2. **Upload ZIP metrics CSV** (one row per ZIP) with fields like `hazard_flag`, `hazard_notes`.  

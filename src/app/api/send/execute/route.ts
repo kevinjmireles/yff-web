@@ -1,0 +1,196 @@
+// src/app/api/send/execute/route.ts
+import { NextRequest } from 'next/server'
+import { requireAdmin } from '@/lib/auth'
+import { jsonOk, jsonErrorWithId } from '@/lib/api'
+import { FEATURE_SEND_EXECUTE } from '@/lib/features'
+import { z } from 'zod'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
+
+const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL
+
+function withTimeout(signal: AbortSignal, ms = 5000) {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort('timeout'), ms)
+  const cleanup = () => clearTimeout(t)
+  signal?.addEventListener?.('abort', () => ctrl.abort('upstream aborted'))
+  return { signal: ctrl.signal, cleanup }
+}
+
+export async function POST(req: NextRequest) {
+  // protected route guard (in addition to middleware)
+  const unauth = requireAdmin(req)
+  if (unauth) return unauth
+
+  if (!FEATURE_SEND_EXECUTE) {
+    return jsonErrorWithId(req, 'FEATURE_DISABLED', 'Send execute is disabled', 403)
+  }
+
+  let body: any
+  try {
+    body = await req.json()
+  } catch {
+    return jsonErrorWithId(req, 'INVALID_BODY', 'Body must be valid JSON', 400)
+  }
+
+  // Reject explicitly empty test emails for modern and legacy shapes
+  if (body?.mode === 'test') {
+    const emails = Array.isArray(body.emails) ? body.emails.filter(Boolean) : []
+    if (emails.length === 0) {
+      return jsonErrorWithId(req, 'INVALID_BODY', 'Test mode requires non-empty emails array', 400)
+    }
+  }
+  if (!body?.mode && Array.isArray(body?.test_emails) && body.test_emails.length === 0) {
+    return jsonErrorWithId(req, 'INVALID_BODY', 'Legacy test_emails cannot be empty', 400)
+  }
+
+  // Compatibility parser: accept new and legacy shapes
+  const LegacyA = z.object({ job_id: z.string().uuid(), test_emails: z.array(z.string().email()) })
+  const LegacyB = z.object({ job_id: z.string().uuid(), dataset_id: z.string().uuid() })
+  const NewTest = z.object({ job_id: z.string().uuid(), mode: z.literal('test'), emails: z.array(z.string().email()) })
+  const NewCohort = z.object({ job_id: z.string().uuid(), mode: z.literal('cohort') })
+
+  type Norm = { job_id: string; mode: 'test'|'cohort'; emails?: string[]; dataset_id?: string }
+  function parseBodyCompat(raw: any): Norm | null {
+    if (NewTest.safeParse(raw).success) { const v = NewTest.parse(raw); return { job_id: v.job_id, mode: 'test', emails: v.emails } }
+    if (NewCohort.safeParse(raw).success) { const v = NewCohort.parse(raw); return { job_id: v.job_id, mode: 'cohort' } }
+    if (LegacyA.safeParse(raw).success) { const v = LegacyA.parse(raw); return { job_id: v.job_id, mode: 'test', emails: v.test_emails } }
+    if (LegacyB.safeParse(raw).success) { const v = LegacyB.parse(raw); return { job_id: v.job_id, mode: 'cohort', dataset_id: v.dataset_id } }
+    return null
+  }
+
+  const norm = parseBodyCompat(body)
+  if (!norm) return jsonErrorWithId(req, 'INVALID_BODY', 'Body must be one of the supported shapes', 400)
+
+  const job_id = norm.job_id
+  let dataset_id = norm.dataset_id
+  const batch_id = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+    ? globalThis.crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36)
+
+  const sb = supabaseAdmin
+
+  // Resolve dataset_id for cohort mode if absent via send_jobs
+  if (norm.mode === 'cohort' && !dataset_id) {
+    const { data: jobRow, error: jobErr } = await sb
+      .from('send_jobs')
+      .select('dataset_id')
+      .eq('id', job_id)
+      .single()
+    if (jobErr) return jsonErrorWithId(req, 'JOB_NOT_FOUND', 'send_job not found', 404)
+    dataset_id = jobRow?.dataset_id ?? null
+  }
+
+  // MVP placeholder / or swap to v_recipients when wired:
+  // NOTE: for MVP we support either explicit test_emails[] or a simple capped pull.
+  let recipients: { email: string }[] = []
+  if (norm.mode === 'test' && Array.isArray(norm.emails) && norm.emails.length > 0) {
+    recipients = norm.emails.map((e: string) => ({ email: e.toLowerCase().trim() }))
+  } else {
+    // MVP: simple deterministic capped pull from profiles (no dataset filter)
+    const cap = Number(process.env.MAX_SEND_PER_RUN ?? 100)
+    const { data, error } = await sb
+      .from('profiles')
+      .select('email')
+      .order('email', { ascending: true })
+      .limit(cap)
+    if (error) return jsonErrorWithId(req, 'AUDIENCE_ERROR', 'Failed to load audience', 500)
+    recipients = (data ?? []).filter((r) => r.email)
+  }
+
+  if (recipients.length === 0) {
+    return jsonOk({ job_id, dataset_id, batch_id, selected: 0, queued: 0, deduped: 0 })
+  }
+
+  // If test mode: do not write to DB; dedupe within provided list
+  if (norm.mode === 'test') {
+    const unique = Array.from(new Set(recipients.map(r => r.email)))
+    const selected = recipients.length
+    const queued = unique.length
+    const deduped = selected - queued
+
+    // Dispatch to Make (best effort) with batch_id
+    if (!MAKE_WEBHOOK_URL) {
+      return jsonErrorWithId(req, 'DISPATCH_FAILED', 'MAKE_WEBHOOK_URL missing', 500)
+    }
+    try {
+      const { signal } = new AbortController()
+      const { signal: timeoutSignal, cleanup } = withTimeout(signal, 5000)
+      const res = await fetch(MAKE_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-request-id': req.headers.get('x-request-id') ?? '',
+        },
+        body: JSON.stringify({ job_id, dataset_id, batch_id, count: queued }),
+        signal: timeoutSignal,
+      })
+      cleanup()
+      if (!res.ok) return jsonErrorWithId(req, 'DISPATCH_FAILED', `Make returned ${res.status}`, 502)
+    } catch (e: any) {
+      return jsonErrorWithId(req, 'DISPATCH_FAILED', String(e?.message ?? e), 504)
+    }
+
+    return jsonOk({ job_id, dataset_id, batch_id, selected, queued, deduped })
+  }
+
+  // cohort mode → idempotent insert to delivery_history by (dataset_id,email)
+  const rows = recipients.map((r) => ({
+    job_id,
+    dataset_id: dataset_id ?? null,
+    batch_id,
+    email: r.email,
+    status: 'queued' as const,
+  }))
+
+  // Additional dedupe against same job_id to avoid double enqueue for same job
+  const { data: existingForJob, error: existingErr } = await sb
+    .from('delivery_history')
+    .select('email')
+    .eq('job_id', job_id)
+    .in('status', ['queued', 'delivered'])
+
+  if (existingErr) return jsonErrorWithId(req, 'HISTORY_ERROR', existingErr.message, 500)
+
+  const existingSet = new Set((existingForJob ?? []).map((r) => r.email))
+  const toInsert = rows.filter((r) => !existingSet.has(r.email))
+
+  if (toInsert.length === 0) {
+    return jsonOk({ job_id, dataset_id, batch_id, selected: recipients.length, queued: 0, deduped: recipients.length })
+  }
+
+  const { data: inserted, error: insertErr } = await sb
+    .from('delivery_history')
+    .upsert(toInsert, { onConflict: 'dataset_id,email', ignoreDuplicates: true })
+    .select('email')
+
+  if (insertErr) return jsonErrorWithId(req, 'INSERT_ERROR', insertErr.message, 500)
+
+  const insertedSet = new Set((inserted ?? []).map((r) => r.email))
+  const dedupedCount = recipients.length - insertedSet.size
+
+  // Dispatch to Make (best effort with 5s timeout)
+  if (!MAKE_WEBHOOK_URL) {
+    return jsonErrorWithId(req, 'DISPATCH_FAILED', 'MAKE_WEBHOOK_URL missing', 500)
+  }
+  try {
+    const { signal } = new AbortController()
+    const { signal: timeoutSignal, cleanup } = withTimeout(signal, 5000)
+    const res = await fetch(MAKE_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-request-id': req.headers.get('x-request-id') ?? '',
+      },
+      body: JSON.stringify({ job_id, dataset_id, batch_id, count: insertedSet.size }),
+      signal: timeoutSignal,
+    })
+    cleanup()
+    if (!res.ok) {
+      return jsonErrorWithId(req, 'DISPATCH_FAILED', `Make returned ${res.status}`, 502)
+    }
+  } catch (e: any) {
+    return jsonErrorWithId(req, 'DISPATCH_FAILED', String(e?.message ?? e), 504)
+  }
+
+  return jsonOk({ job_id, dataset_id, batch_id, selected: recipients.length, queued: insertedSet.size, deduped: dedupedCount })
+}

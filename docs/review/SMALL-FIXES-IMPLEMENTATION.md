@@ -191,7 +191,7 @@ EOF
 ## 🎬 Next Steps
 
 ### **For Code Review** (Now)
-1. Share `docs/review/PR-REVIEW-SMALL-FIXES.md` with code reviewer
+1. Share `docs/review/SMALL-FIXES-PR-REVIEW.md` with code reviewer
 2. Reviewer validates changes against acceptance criteria
 3. Reviewer confirms test-auth logic matches middleware
 4. Reviewer approves or requests changes
@@ -235,8 +235,8 @@ EOF
 - [x] Backward compatibility maintained
 
 **Review artifacts ready:**
-- [x] `docs/review/PR-REVIEW-SMALL-FIXES.md` - Full PR review package
-- [x] `docs/review/IMPLEMENTATION-SUMMARY.md` - This summary
+- [x] `docs/review/SMALL-FIXES-PR-REVIEW.md` - Full PR review package
+- [x] `docs/review/SMALL-FIXES-IMPLEMENTATION.md` - This summary
 - [x] Build logs show success
 - [x] No errors or warnings
 
