@@ -7,20 +7,28 @@ const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
 export const GET = async () => {
   const sb = createClient(url, key, { auth: { persistSession: false } })
 
-  // list indexes on delivery_history
-  const { data: idxData, error: idxErr } = await sb
-    .from('pg_indexes' as any)
-    .select('indexname')
-    .eq('schemaname', 'public')
-    .eq('tablename', 'delivery_history')
+  const job = crypto.randomUUID()
+  const batch = crypto.randomUUID()
+  const pmid = `diag-${crypto.randomUUID()}`
+  const email = `diag+${pmid}@example.com`
 
-  // show a short fingerprint of which project we’re hitting
-  const fingerprint = url?.replace(/^https?:\/\//, '').slice(-16)
+  // Attempt an upsert that relies on onConflict: 'provider_message_id'
+  const { error: upsertErr } = await sb
+    .from('delivery_history')
+    .upsert(
+      [{ job_id: job, batch_id: batch, email, status: 'queued', provider_message_id: pmid }],
+      { onConflict: 'provider_message_id' }
+    )
+
+  // Best-effort cleanup (even if upsertErr exists)
+  await sb.from('delivery_history').delete().eq('provider_message_id', pmid)
+
+  const lacksUniqueIndex = !!(upsertErr && /no unique or exclusion constraint/i.test(upsertErr.message))
+  const hasProviderMsgIdUnique = !lacksUniqueIndex
 
   return NextResponse.json({
-    supabaseUrl_fingerprint: fingerprint, // last chars only
-    has_provider_message_id_unique: (idxData || []).some((i: any) => i.indexname === 'ux_delivery_history_provider_message_id'),
-    indexes: (idxData || []).map((i: any) => i.indexname),
-    error: (idxErr as any)?.message || null
+    supabaseUrl_fingerprint: url.replace(/^https?:\/\//, '').slice(-16),
+    has_provider_message_id_unique: hasProviderMsgIdUnique,
+    upsert_error: upsertErr?.message ?? null,
   })
 }
