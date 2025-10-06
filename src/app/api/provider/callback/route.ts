@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { z } from 'zod'
 
 const SHARED = process.env.MAKE_SHARED_TOKEN
+const PG_UNIQUE_VIOLATION = '23505'
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get('x-shared-token')
@@ -55,39 +56,63 @@ export async function POST(req: NextRequest) {
   // Idempotent write for each result
   for (const r of results) {
     const email = r.email.toLowerCase().trim()
-    const meta = r.error ? { error: r.error } : (r as any).meta ?? null
+    const status = r.status
+    const meta = r.meta ?? (r.error ? { error: r.error } : null)
+    const pmid = r.provider_message_id ?? null
+    const nowIso = new Date().toISOString()
 
-    if (r.provider_message_id) {
-      // Keep provider_message_id upsert path (idempotent by provider id)
-      const { error } = await sb
+    // 1) UPDATE-FIRST by (job_id, batch_id, email) to touch the row created by /execute
+    {
+      const { error: updErr, count } = await sb
+        .from('delivery_history')
+        .update(
+          { status, meta, provider_message_id: pmid, updated_at: nowIso },
+          { count: 'exact' }
+        )
+        .eq('job_id', job_id)
+        .eq('batch_id', batch_id)
+        .eq('email', email)
+
+      if (updErr) {
+        if ((updErr as any)?.code === PG_UNIQUE_VIOLATION) {
+          // Another row already holds this provider_message_id — treat as idempotent success
+          console.warn('provider_callback: unique race on provider_message_id', { job_id, batch_id, email, pmid })
+          continue
+        }
+        return jsonErrorWithId(req, 'UPDATE_ERROR', updErr.message, 500)
+      }
+
+      if ((count ?? 0) > 0) {
+        // Successfully updated the pre-created row — done
+        continue
+      }
+    }
+
+    // 2) No row to update; if we have pmid, UPSERT by provider_message_id (idempotent)
+    if (pmid) {
+      const { error: upsertErr } = await sb
         .from('delivery_history')
         .upsert(
-          [{ provider_message_id: r.provider_message_id, job_id, batch_id, email, status: r.status, meta }],
-          { onConflict: 'provider_message_id', ignoreDuplicates: true }
+          [{ job_id, batch_id, email, status, meta, provider_message_id: pmid, updated_at: nowIso }],
+          { onConflict: 'provider_message_id' }
         )
-      if (error) return jsonErrorWithId(req, 'INSERT_ERROR', error.message, 500)
+
+      if (upsertErr && (upsertErr as any)?.code !== PG_UNIQUE_VIOLATION) {
+        return jsonErrorWithId(req, 'INSERT_ERROR', upsertErr.message, 500)
+      }
+
+      // either inserted, updated, or collided idempotently — done
       continue
     }
 
-    // Fallback: update-or-insert without relying on ON CONFLICT unique
-    const { data: updRows, error: updErr } = await sb
-      .from('delivery_history')
-      .update({ status: r.status, meta })
-      .eq('job_id', job_id)
-      .eq('batch_id', batch_id)
-      .eq('email', email)
-      .select('id')
-
-    if (updErr) {
-      return jsonErrorWithId(req, 'UPDATE_ERROR', `Failed to update history for ${email}`, 500)
-    }
-
-    if (!updRows || updRows.length === 0) {
+    // 3) Final fallback (no pmid and no matching row) — minimal INSERT
+    {
       const { error: insErr } = await sb
         .from('delivery_history')
-        .insert([{ job_id, batch_id, email, status: r.status, meta }])
-      if (insErr && (insErr as any).code !== '23505') {
-        return jsonErrorWithId(req, 'INSERT_ERROR', `Failed to insert history for ${email}`, 500)
+        .insert([{ job_id, batch_id, email, status, meta, updated_at: nowIso }])
+
+      if (insErr) {
+        return jsonErrorWithId(req, 'INSERT_ERROR', insErr.message, 500)
       }
     }
   }
