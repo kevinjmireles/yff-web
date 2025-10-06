@@ -17,8 +17,7 @@ export function requireAdmin(req: NextRequest) {
   // Safe header accessor for tests/mocks lacking a real Headers instance
   const getHeader = (key: string): string | null => {
     try {
-      // @ts-expect-error tolerate non-standard request stubs in tests
-      const h = req?.headers as Headers | { get?: (k: string) => string | null } | undefined
+      const h = (req as any)?.headers as { get?: (k: string) => string | null } | undefined
       if (!h || typeof h.get !== 'function') return null
       return h.get(key)
     } catch {
