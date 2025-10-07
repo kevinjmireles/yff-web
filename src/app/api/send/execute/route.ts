@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL
+const TEST_DATASET_ID = '00000000-0000-0000-0000-000000000001'
 
 function withTimeout(signal: AbortSignal, ms = 5000) {
   const ctrl = new AbortController()
@@ -17,14 +18,29 @@ function withTimeout(signal: AbortSignal, ms = 5000) {
 }
 
 /**
- * Ensures a send_jobs row exists for the given job_id to satisfy FK constraints.
+ * Ensures test dataset exists for test mode jobs.
  * Idempotent: if row exists, does nothing; otherwise creates minimal row.
  */
-async function ensureSendJob(sb: any, job_id: string, dataset_id?: string | null) {
+async function ensureTestDataset(sb: any) {
+  const { error } = await sb
+    .from('content_datasets')
+    .upsert(
+      [{ id: TEST_DATASET_ID, name: '__test__', created_at: new Date().toISOString() }],
+      { onConflict: 'id', ignoreDuplicates: true }
+    )
+  if (error) throw new Error(`Failed to ensure test dataset: ${error.message}`)
+}
+
+/**
+ * Ensures a send_jobs row exists for the given job_id to satisfy FK constraints.
+ * Idempotent: if row exists, does nothing; otherwise creates minimal row.
+ * dataset_id is required (NOT NULL constraint).
+ */
+async function ensureSendJob(sb: any, job_id: string, dataset_id: string) {
   const { error } = await sb
     .from('send_jobs')
     .upsert(
-      [{ id: job_id, dataset_id: dataset_id ?? null, status: 'pending', created_at: new Date().toISOString() }],
+      [{ id: job_id, dataset_id, status: 'pending', created_at: new Date().toISOString() }],
       { onConflict: 'id', ignoreDuplicates: true }
     )
   if (error) throw new Error(`Failed to ensure send_jobs row: ${error.message}`)
@@ -83,9 +99,21 @@ export async function POST(req: NextRequest) {
 
   const sb = supabaseAdmin
 
+  // For test mode, use sentinel dataset to satisfy NOT NULL constraint
+  const datasetForJob = dataset_id || TEST_DATASET_ID
+
+  // Ensure test dataset exists if using sentinel
+  if (!dataset_id) {
+    try {
+      await ensureTestDataset(sb)
+    } catch (e: any) {
+      return jsonErrorWithId(req, 'TEST_DATASET_ERROR', e.message, 500)
+    }
+  }
+
   // Ensure send_jobs row exists to prevent FK violations in callbacks
   try {
-    await ensureSendJob(sb, job_id, dataset_id)
+    await ensureSendJob(sb, job_id, datasetForJob)
   } catch (e: any) {
     return jsonErrorWithId(req, 'SEND_JOB_ERROR', e.message, 500)
   }
@@ -132,7 +160,7 @@ export async function POST(req: NextRequest) {
     // Write queued rows to delivery_history so callbacks have rows to update
     const rows = unique.map((email) => ({
       job_id,
-      dataset_id: dataset_id ?? null,
+      dataset_id: datasetForJob,
       batch_id,
       email,
       status: 'queued' as const,
@@ -157,7 +185,7 @@ export async function POST(req: NextRequest) {
           'content-type': 'application/json',
           'x-request-id': req.headers.get('x-request-id') ?? '',
         },
-        body: JSON.stringify({ job_id, dataset_id, batch_id, count: queued }),
+        body: JSON.stringify({ job_id, dataset_id: datasetForJob, batch_id, count: queued }),
         signal: timeoutSignal,
       })
       cleanup()
@@ -166,7 +194,7 @@ export async function POST(req: NextRequest) {
       return jsonErrorWithId(req, 'DISPATCH_FAILED', String(e?.message ?? e), 504)
     }
 
-    return jsonOk({ job_id, dataset_id, batch_id, selected, queued, deduped })
+    return jsonOk({ job_id, dataset_id: datasetForJob, batch_id, selected, queued, deduped })
   }
 
   // cohort mode → idempotent insert to delivery_history by (dataset_id,email)
