@@ -16,6 +16,20 @@ function withTimeout(signal: AbortSignal, ms = 5000) {
   return { signal: ctrl.signal, cleanup }
 }
 
+/**
+ * Ensures a send_jobs row exists for the given job_id to satisfy FK constraints.
+ * Idempotent: if row exists, does nothing; otherwise creates minimal row.
+ */
+async function ensureSendJob(sb: any, job_id: string, dataset_id?: string | null) {
+  const { error } = await sb
+    .from('send_jobs')
+    .upsert(
+      [{ id: job_id, dataset_id: dataset_id ?? null, status: 'pending', created_at: new Date().toISOString() }],
+      { onConflict: 'id', ignoreDuplicates: true }
+    )
+  if (error) throw new Error(`Failed to ensure send_jobs row: ${error.message}`)
+}
+
 export async function POST(req: NextRequest) {
   // protected route guard (in addition to middleware)
   const unauth = requireAdmin(req)
@@ -69,6 +83,13 @@ export async function POST(req: NextRequest) {
 
   const sb = supabaseAdmin
 
+  // Ensure send_jobs row exists to prevent FK violations in callbacks
+  try {
+    await ensureSendJob(sb, job_id, dataset_id)
+  } catch (e: any) {
+    return jsonErrorWithId(req, 'SEND_JOB_ERROR', e.message, 500)
+  }
+
   // Resolve dataset_id for cohort mode if absent via send_jobs
   if (norm.mode === 'cohort' && !dataset_id) {
     const { data: jobRow, error: jobErr } = await sb
@@ -101,12 +122,27 @@ export async function POST(req: NextRequest) {
     return jsonOk({ job_id, dataset_id, batch_id, selected: 0, queued: 0, deduped: 0 })
   }
 
-  // If test mode: do not write to DB; dedupe within provided list
+  // Test mode: write to delivery_history for callback testing, then dispatch
   if (norm.mode === 'test') {
     const unique = Array.from(new Set(recipients.map(r => r.email)))
     const selected = recipients.length
     const queued = unique.length
     const deduped = selected - queued
+
+    // Write queued rows to delivery_history so callbacks have rows to update
+    const rows = unique.map((email) => ({
+      job_id,
+      dataset_id: dataset_id ?? null,
+      batch_id,
+      email,
+      status: 'queued' as const,
+    }))
+
+    const { error: insertErr } = await sb
+      .from('delivery_history')
+      .insert(rows)
+
+    if (insertErr) return jsonErrorWithId(req, 'INSERT_ERROR', insertErr.message, 500)
 
     // Dispatch to Make (best effort) with batch_id
     if (!MAKE_WEBHOOK_URL) {
