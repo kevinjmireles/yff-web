@@ -59,14 +59,13 @@ export async function POST(req: NextRequest) {
     const status = r.status
     const meta = r.meta ?? (r.error ? { error: r.error } : null)
     const pmid = r.provider_message_id ?? null
-    const nowIso = new Date().toISOString()
 
     // 1) UPDATE-FIRST by (job_id, batch_id, email) to touch the row created by /execute
     {
       const { error: updErr, count } = await sb
         .from('delivery_history')
         .update(
-          { status, meta, provider_message_id: pmid, updated_at: nowIso },
+          { status, meta, provider_message_id: pmid },
           { count: 'exact' }
         )
         .eq('job_id', job_id)
@@ -93,7 +92,7 @@ export async function POST(req: NextRequest) {
       const { error: upsertErr } = await sb
         .from('delivery_history')
         .upsert(
-          [{ job_id, batch_id, email, status, meta, provider_message_id: pmid, updated_at: nowIso }],
+          [{ job_id, batch_id, email, status, meta, provider_message_id: pmid }],
           { onConflict: 'provider_message_id' }
         )
 
@@ -109,7 +108,7 @@ export async function POST(req: NextRequest) {
     {
       const { error: insErr } = await sb
         .from('delivery_history')
-        .insert([{ job_id, batch_id, email, status, meta, updated_at: nowIso }])
+        .insert([{ job_id, batch_id, email, status, meta }])
 
       if (insErr) {
         return jsonErrorWithId(req, 'INSERT_ERROR', insErr.message, 500)
