@@ -1,0 +1,23 @@
+name: e2e
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:e2e
+        env:
+          BASE: https://yff-web.vercel.app
+          ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
+          MAKE_SHARED_TOKEN: ${{ secrets.MAKE_SHARED_TOKEN }}
+
+
