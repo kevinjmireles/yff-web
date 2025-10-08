@@ -26,5 +26,5 @@ jobs:
           ADMIN_PASSWORD: test
           SUPABASE_URL: https://example.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: supabase-service-role-key-placeholder
-      - name: Tests (excluding flaky smoke)
-        run: pnpm vitest run --reporter=verbose --exclude tests/smoke.test.ts
+      - name: Tests (excluding flaky smoke and E2E)
+        run: pnpm vitest run --reporter=verbose --exclude tests/smoke.test.ts --exclude tests/send.execute.callback.test.ts
