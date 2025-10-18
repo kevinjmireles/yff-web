@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
         .from('delivery_history')
         .upsert(
           [{ job_id, batch_id, email, status, meta, provider_message_id: pmid }],
-          { onConflict: 'provider_message_id' }
+          { onConflict: 'provider_message_id,email' }
         )
 
       if (upsertErr && (upsertErr as any)?.code !== PG_UNIQUE_VIOLATION) {
