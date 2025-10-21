@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { metricRowsFromOcdIds } from '@/lib/geo/fromOcd'
 
 // Ensure this route runs on Node.js runtime (required for supabase admin client)
 export const runtime = 'nodejs'
@@ -204,10 +205,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Database error' }, { status: 500 });
     }
 
-    // 5) Success monitoring log
+    // 5) Populate geo_metrics for personalization targeting
+    // Delete-then-insert ensures one canonical value per metric_key
+    const metricRows = metricRowsFromOcdIds(ocdIds);
+    if (metricRows.length > 0) {
+      const keys = ['state', 'county_fips', 'place'];
+
+      // Delete existing metrics to ensure canonical values
+      const { error: delErr } = await supabaseAdmin
+        .from('geo_metrics')
+        .delete()
+        .eq('user_id', profRow.user_id)
+        .in('metric_key', keys);
+
+      if (delErr) {
+        console.error('geo_metrics delete failed:', delErr);
+        // Non-fatal, continue
+      }
+
+      // Insert fresh canonical triplet
+      const { error: geoErr } = await supabaseAdmin
+        .from('geo_metrics')
+        .insert(metricRows.map(r => ({
+          user_id: profRow.user_id,
+          metric_key: r.metric_key,
+          metric_value: r.metric_value,
+          source: 'civic_api'
+        })));
+
+      if (geoErr) {
+        console.error('geo_metrics insert failed:', geoErr);
+        // Non-fatal, user signup still succeeded
+      } else {
+        console.log('geo_metrics_created', { user_id: profRow.user_id, count: metricRows.length });
+      }
+    }
+
+    // 6) Success monitoring log
     console.log('signup_ok', { email, zipcode, nOcd: ocdIds.length });
 
-    // 6) Response
+    // 7) Response
     return NextResponse.json({
       success: true,
       message: 'Thanks for signing up!',

@@ -10,6 +10,7 @@ import {
   type GeoCtx,
   type ContentRow
 } from '@/lib/personalize/helpers'
+import { metricRowsFromOcdIds, type MetricRow } from '@/lib/geo/fromOcd'
 
 const QuerySchema = z.object({
   job_id: z.string().uuid(),
@@ -53,6 +54,25 @@ function htmlToText(html: string) {
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/**
+ * Convert metric rows to GeoCtx for targeting evaluation
+ * Fallback for when v_subscriber_geo returns NULL
+ */
+function geoCtxFromMetricRows(rows: MetricRow[]): GeoCtx {
+  const ctx: GeoCtx = {}
+  for (const r of rows) {
+    if (r.metric_key === 'state') {
+      ctx.state = r.metric_value
+    } else if (r.metric_key === 'county_fips') {
+      ctx.county_fips = r.metric_value
+    } else if (r.metric_key === 'place') {
+      // "place,st" → "place" (extract just the place name)
+      ctx.place = r.metric_value.split(',')[0]
+    }
+  }
+  return ctx
 }
 
 export async function GET(req: NextRequest) {
@@ -99,7 +119,10 @@ export async function GET(req: NextRequest) {
   if (gErr) return NextResponse.json({ ok: false, error: 'GEO_LOOKUP_FAILED', details: gErr.message }, { status: 500 })
 
   const userOcdIds: string[] = Array.isArray(profile.ocd_ids) ? profile.ocd_ids : []
-  const geoCtx: GeoCtx = geo ?? {}
+
+  // Fallback: if v_subscriber_geo is NULL, derive geo from ocd_ids
+  // This handles users who signed up before geo_metrics were populated
+  const geoCtx: GeoCtx = geo ?? geoCtxFromMetricRows(metricRowsFromOcdIds(profile.ocd_ids))
 
   // 2) Load ALL content candidates for dataset (single query)
   const { data: rows, error: cErr } = await supabaseAdmin
