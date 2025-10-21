@@ -52,10 +52,12 @@ export default function middleware(req: NextRequest) {
   const testAccessRequired = process.env.TEST_ACCESS_TOKEN || '';
 
   // Allowlist helper and health endpoints (enables setting test_access cookie in prod)
+  // Also exclude /api/send/personalize (called by Make.com, no auth needed - protected by job_id UUIDs)
   const isHelperRoute =
     pathname.startsWith('/api/test-auth') ||
     pathname.startsWith('/api/echo-ip') ||
-    pathname.startsWith('/api/health');
+    pathname.startsWith('/api/health') ||
+    pathname === '/api/send/personalize';
 
   // Restrict gate scope to admin UI and admin/send APIs only (do not gate public APIs)
   // Exclude the login UI and login API so users can obtain a session
@@ -107,7 +109,8 @@ export default function middleware(req: NextRequest) {
   }
 
   // Bearer admin token support (defense-in-depth for CI/bots)
-  if (isAdminAPI || isSendAPI) {
+  // Skip auth check for helper routes (already allowed above)
+  if ((isAdminAPI || isSendAPI) && !isHelperRoute) {
     const authHeader = req.headers.get('authorization') || req.headers.get('x-admin-token') || ''
     const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader
     const tokenOk = !!(bearer && process.env.ADMIN_API_TOKEN && bearer === process.env.ADMIN_API_TOKEN)
