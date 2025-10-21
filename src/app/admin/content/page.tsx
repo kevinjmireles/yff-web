@@ -62,6 +62,12 @@ export default function AdminContentPage() {
   }, [progress, results])
 
   const handleFile = (file: File) => {
+    // Validate dataset name before processing
+    if (!datasetName.trim()) {
+      alert('Please enter a dataset name before uploading')
+      return
+    }
+
     allRowsRef.current = []
     setProgress({ total: 0, done: 0 })
     setResults([])
