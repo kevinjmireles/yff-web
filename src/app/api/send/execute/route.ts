@@ -76,13 +76,13 @@ export async function POST(req: NextRequest) {
   // Compatibility parser: accept new and legacy shapes
   const LegacyA = z.object({ job_id: z.string().uuid(), test_emails: z.array(z.string().email()) })
   const LegacyB = z.object({ job_id: z.string().uuid(), dataset_id: z.string().uuid() })
-  const NewTest = z.object({ job_id: z.string().uuid(), mode: z.literal('test'), emails: z.array(z.string().email()) })
-  const NewCohort = z.object({ job_id: z.string().uuid(), mode: z.literal('cohort') })
+  const NewTest = z.object({ job_id: z.string().uuid(), mode: z.literal('test'), emails: z.array(z.string().email()), dataset_id: z.string().uuid().optional() })
+  const NewCohort = z.object({ job_id: z.string().uuid(), mode: z.literal('cohort'), dataset_id: z.string().uuid().optional() })
 
   type Norm = { job_id: string; mode: 'test'|'cohort'; emails?: string[]; dataset_id?: string }
   function parseBodyCompat(raw: any): Norm | null {
-    if (NewTest.safeParse(raw).success) { const v = NewTest.parse(raw); return { job_id: v.job_id, mode: 'test', emails: v.emails } }
-    if (NewCohort.safeParse(raw).success) { const v = NewCohort.parse(raw); return { job_id: v.job_id, mode: 'cohort' } }
+    if (NewTest.safeParse(raw).success) { const v = NewTest.parse(raw); return { job_id: v.job_id, mode: 'test', emails: v.emails, dataset_id: v.dataset_id } }
+    if (NewCohort.safeParse(raw).success) { const v = NewCohort.parse(raw); return { job_id: v.job_id, mode: 'cohort', dataset_id: v.dataset_id } }
     if (LegacyA.safeParse(raw).success) { const v = LegacyA.parse(raw); return { job_id: v.job_id, mode: 'test', emails: v.test_emails } }
     if (LegacyB.safeParse(raw).success) { const v = LegacyB.parse(raw); return { job_id: v.job_id, mode: 'cohort', dataset_id: v.dataset_id } }
     return null

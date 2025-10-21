@@ -160,7 +160,8 @@ export default function AdminContentPage() {
       body: JSON.stringify({
         job_id: crypto.randomUUID(),
         mode: 'test',
-        emails: emailArray
+        emails: emailArray,
+        dataset_id: datasetId  // Include dataset_id so personalize API finds the content
       }),
     })
 
