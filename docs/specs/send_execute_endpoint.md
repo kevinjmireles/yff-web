@@ -10,34 +10,55 @@
 ## Request
 
 ### Headers
-- `Cookie: admin=<admin_cookie>` - Required for admin authentication
+- `Authorization: Bearer <ADMIN_API_TOKEN>` or `X-Admin-Token: <ADMIN_API_TOKEN>` - Required for admin authentication (alternatively use admin cookie)
+- `Cookie: admin=<admin_cookie>` - Alternative admin session auth
 - `Content-Type: application/json`
 - `X-Request-Id: <uuid>` - Optional, for request tracking
 
 ### Body
 
-**Test Mode** (explicit email list):
-```json
-{
-  "job_id": "uuid",
-  "test_emails": ["user@example.com", "admin@example.com"]
-}
-```
+Two compatible request shapes are supported.
 
-**Cohort Mode** (dataset-based audience):
-```json
-{
-  "job_id": "uuid",
-  "dataset_id": "uuid"
-}
-```
+- Modern (recommended)
+  - Test Mode:
+    ```json
+    {
+      "job_id": "uuid",
+      "mode": "test",
+      "emails": ["user@example.com", "admin@example.com"]
+    }
+    ```
+  - Cohort Mode:
+    ```json
+    {
+      "job_id": "uuid",
+      "mode": "cohort",
+      "dataset_id": "uuid"
+    }
+    ```
+
+- Legacy (still accepted)
+  - Test Mode:
+    ```json
+    {
+      "job_id": "uuid",
+      "test_emails": ["user@example.com", "admin@example.com"]
+    }
+    ```
+  - Cohort Mode:
+    ```json
+    {
+      "job_id": "uuid",
+      "dataset_id": "uuid"
+    }
+    ```
 
 ### Validation Rules
 - `job_id` is required (UUID string)
-- Either `dataset_id` OR `test_emails[]` is required (mutually exclusive)
-- `test_emails[]` must be array of valid email addresses
+- Provide either test recipients or a dataset:
+  - Modern: `mode` is required (`"test" | "cohort"`); `emails[]` required for `test`, `dataset_id` required for `cohort`
+  - Legacy: `test_emails[]` or `dataset_id` (mutually exclusive)
 - Emails are normalized: lowercased and trimmed
-- **Note:** No `mode` parameter needed - mode is auto-detected based on which parameter is present
 
 ---
 
@@ -50,8 +71,10 @@
   "data": {
     "job_id": "uuid",
     "dataset_id": "uuid",
+    "batch_id": "uuid",
+    "selected": 42,
     "queued": 42,
-    "deduped": 8
+    "deduped": 0
   }
 }
 ```
@@ -129,20 +152,21 @@
 
 ### Audience Selection
 
-Mode is **auto-detected** based on which parameter is present:
+Both modern and legacy shapes are accepted (see Request Body). The execution mode is derived from the presence of `mode`, `emails[]`/`test_emails[]`, and/or `dataset_id`:
 
-**Test Mode** (when `test_emails[]` provided):
-- Uses explicit email list from request body
-- No database query for audience
+**Test Mode**
+- Uses the explicit email list from the request body
 - Normalizes emails (lowercase, trim)
-- Deduplicates within provided list
-- `dataset_id` will be `null` in response
+- Deduplicates within the provided list
+- Uses a sentinel dataset to satisfy FK constraints:
+  - Sentinel dataset id: `00000000-0000-0000-0000-000000000001`
+  - Auto-created as `content_datasets(id, name='__test__')` on first use
+  - Response includes `dataset_id` set to the sentinel value
 
-**Cohort Mode** (when `dataset_id` provided):
-- Queries `profiles` table with `dataset_id` filter
-- Limit: 1000 recipients (TODO: replace with `v_recipients` view)
-- Future: Will support audience rule targeting
-- `test_emails` must not be provided
+**Cohort Mode**
+- Queries `profiles` (MVP) to build the audience
+- Limit is controlled by `MAX_SEND_PER_RUN` (default 100)
+- Future: will use `v_recipients` and audience rules
 
 ### Make.com Dispatch
 
@@ -151,6 +175,7 @@ Mode is **auto-detected** based on which parameter is present:
 {
   "job_id": "uuid",
   "dataset_id": "uuid",
+  "batch_id": "uuid",
   "count": 42
 }
 ```
@@ -175,27 +200,18 @@ Mode is **auto-detected** based on which parameter is present:
 
 ### `delivery_history` Table
 
-**Rows inserted:**
-```sql
-INSERT INTO delivery_history (job_id, dataset_id, email, status)
-VALUES
-  ('job-uuid', 'dataset-uuid', 'user@example.com', 'queued'),
-  ('job-uuid', 'dataset-uuid', 'admin@example.com', 'queued')
-ON CONFLICT (dataset_id, email) DO NOTHING
-```
+Test mode inserts one `queued` row per unique email with the sentinel `dataset_id`; cohort mode upserts by `(dataset_id,email)` and dedupes within the same `job_id` against existing `queued`/`delivered` rows.
 
-**Columns:**
-- `job_id` - Send job UUID
-- `dataset_id` - Content dataset UUID (null for test mode)
-- `email` - Recipient email (normalized)
-- `status` - Always `'queued'` on insert
-- `created_at` - Timestamp
+Relevant constraints and indexes:
+- Unique: `(dataset_id, email)` — cohort mode idempotency
+- Unique: `provider_message_id` — idempotent provider callbacks (plain UNIQUE; NULLs allowed)
+- Index: `(job_id, batch_id, email)` — accelerates callback update-first path
 
 ---
 
 ## Unsubscribe URL Format
 
-**Generated for each recipient** (by Make.com, using `UNSUB_SECRET` and `BASE_URL`):
+**Generated for each recipient** (by Make.com, using `UNSUBSCRIBE_SIGNING_SECRET` and `BASE_URL`):
 
 ```
 https://your-app.vercel.app/api/unsubscribe?email=user@example.com&list=general&token=HMAC_BASE64URL
@@ -205,7 +221,7 @@ https://your-app.vercel.app/api/unsubscribe?email=user@example.com&list=general&
 ```typescript
 import crypto from 'crypto'
 
-const SECRET = process.env.UNSUB_SECRET
+const SECRET = process.env.UNSUBSCRIBE_SIGNING_SECRET
 const data = `${email}:${listKey}` // e.g., "user@example.com:general"
 const token = crypto.createHmac('sha256', SECRET)
   .update(data)
@@ -223,11 +239,15 @@ const token = crypto.createHmac('sha256', SECRET)
 
 **Required:**
 - `SUPABASE_URL` - Supabase project URL (server-side)
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (bypasses RLS)
+- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (server-side)
+- `ADMIN_API_TOKEN` - Bearer token for admin APIs (Authorization or X-Admin-Token)
 - `MAKE_WEBHOOK_URL` - Make.com webhook endpoint
+- `MAKE_SHARED_TOKEN` - Shared secret for provider callback (`X-Shared-Token`)
 - `FEATURE_SEND_EXECUTE` - Feature flag (default `1`)
 
 **Optional:**
+- `MAX_SEND_PER_RUN` - Cap cohort audience size (default 100)
+- `SENDGRID_TEMPLATE_ID` - Reserved for provider integration
 - `X-Request-Id` - Request tracking header (propagated to logs)
 
 ---
@@ -240,10 +260,11 @@ See `docs/review/SEND-LOOP-SMOKE-TESTS.md` for complete test suite.
 ```bash
 curl -X POST https://your-app.vercel.app/api/send/execute \
   -H 'Content-Type: application/json' \
-  -H 'Cookie: admin=<your-admin-cookie>' \
+  -H 'Authorization: Bearer '$ADMIN_API_TOKEN \
   -d '{
     "job_id": "job-test-1",
-    "test_emails": ["test@example.com"]
+    "mode": "test",
+    "emails": ["test@example.com"]
   }'
 ```
 
@@ -253,7 +274,9 @@ curl -X POST https://your-app.vercel.app/api/send/execute \
   "ok": true,
   "data": {
     "job_id": "job-test-1",
-    "dataset_id": null,
+    "dataset_id": "00000000-0000-0000-0000-000000000001",
+    "batch_id": "<uuid>",
+    "selected": 1,
     "queued": 1,
     "deduped": 0
   }

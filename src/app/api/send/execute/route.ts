@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
           'content-type': 'application/json',
           'x-request-id': req.headers.get('x-request-id') ?? '',
         },
-        body: JSON.stringify({ job_id, dataset_id: datasetForJob, batch_id, count: queued }),
+        body: JSON.stringify({ job_id, dataset_id: datasetForJob, batch_id, count: queued, emails: unique }),
         signal: timeoutSignal,
       })
       cleanup()
@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
         'content-type': 'application/json',
         'x-request-id': req.headers.get('x-request-id') ?? '',
       },
-      body: JSON.stringify({ job_id, dataset_id, batch_id, count: insertedSet.size }),
+      body: JSON.stringify({ job_id, dataset_id, batch_id, count: insertedSet.size, emails: Array.from(insertedSet) }),
       signal: timeoutSignal,
     })
     cleanup()

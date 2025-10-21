@@ -43,9 +43,10 @@ EDGE_SHARED_SECRET=your_edge_shared_secret
 # Make.com Webhook
 NEXT_PUBLIC_MAKE_WEBHOOK_URL=your_make_webhook_url
 
-# Server-side Make.com integration for enqueue/execute
+# Server-side Make.com integration for enqueue/execute & callbacks
 MAKE_WEBHOOK_URL=your_make_webhook_url
 MAKE_SHARED_TOKEN=shared_secret_between_yff_and_make
+ADMIN_API_TOKEN=admin_api_token_for_bearer_auth
 SENDGRID_TEMPLATE_ID=your_sendgrid_dynamic_template_id
 MAX_SEND_PER_RUN=100
 ```

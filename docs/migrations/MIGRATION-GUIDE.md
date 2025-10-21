@@ -1,7 +1,24 @@
 # Send Loop MVP - Migration & Testing Guide
 
-**Date:** October 1, 2025  
-**Status:** Ready for Migration
+**Date:** October 1, 2025
+**Status:** ✅ Deployed to Production
+**Updated:** October 6, 2025 (Hotfix applied)
+
+---
+
+## ⚠️ Important: Test Data Convention
+
+All test mode executes use a **sentinel dataset ID** to satisfy FK constraints:
+
+- **Sentinel Dataset ID:** `00000000-0000-0000-0000-000000000001`
+- **Dataset Name:** `__test__`
+- **Auto-created:** First test mode execute creates this in `content_datasets`
+- **Usage:** All test jobs reference this `dataset_id` in `send_jobs` and `delivery_history`
+- **Cleanup:** Safe to delete test data with:
+  ```sql
+  DELETE FROM delivery_history WHERE dataset_id = '00000000-0000-0000-0000-000000000001';
+  DELETE FROM send_jobs WHERE dataset_id = '00000000-0000-0000-0000-000000000001';
+  ```
 
 ---
 
@@ -88,6 +105,27 @@ create unique index if not exists uq_unsubscribes_email_list
   on public.unsubscribes (email, list_key);
 ```
 
+**Migration 4: `20251006_provider_msgid_unique.sql`** (Hotfix)
+```sql
+-- Make provider_message_id usable for ON CONFLICT
+DROP INDEX IF EXISTS ux_delivery_history_provider_message_id;
+CREATE UNIQUE INDEX ux_delivery_history_provider_message_id
+ON public.delivery_history (provider_message_id);
+
+CREATE INDEX IF NOT EXISTS ix_delivery_history_job_batch_email
+ON public.delivery_history (job_id, batch_id, email);
+```
+
+**Migration 5: `20251006_add_updated_at_delivery_history.sql`** (Temporary - Schema Cache Fix)
+```sql
+-- Temporary column to resolve PostgREST cache mismatch
+ALTER TABLE public.delivery_history
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NULL;
+
+COMMENT ON COLUMN public.delivery_history.updated_at IS
+  'Temporary column added 2025-10-06 to resolve PostgREST cache mismatch. Safe to drop after cache clears.';
+```
+
 ### **Via Supabase CLI**
 
 ```bash
@@ -106,15 +144,15 @@ supabase db push
 
 ### **Test Mode** (Explicit Emails)
 
-**Correct API shape (no `mode` parameter):**
+**Note:** Test mode now writes to `delivery_history` with sentinel dataset ID.
 
 ```bash
 curl -i -X POST http://localhost:3001/api/send/execute \
   -H 'Content-Type: application/json' \
-  -H 'Cookie: admin=<your-cookie>' \
+  -H 'Authorization: Bearer $ADMIN_API_TOKEN' \
   -d '{
-    "job_id": "00000000-0000-0000-0000-0000000000aa",
-    "test_emails": ["a@example.com", "b@example.com", "a@example.com"]
+    "job_id": "test-'$(uuidgen)'",
+    "test_emails": ["a@example.com", "b@example.com"]
   }'
 ```
 
@@ -124,9 +162,11 @@ curl -i -X POST http://localhost:3001/api/send/execute \
   "ok": true,
   "data": {
     "job_id": "00000000-0000-0000-0000-0000000000aa",
-    "dataset_id": null,
+    "dataset_id": "00000000-0000-0000-0000-000000000001",
+    "batch_id": "<uuid>",
+    "selected": 2,
     "queued": 2,
-    "deduped": 1
+    "deduped": 0
   }
 }
 ```
@@ -139,14 +179,15 @@ SELECT * FROM delivery_history WHERE job_id = '00000000-0000-0000-0000-000000000
 
 ### **Cohort Mode** (Dataset-based)
 
-**Correct API shape:**
+**Modern API shape:**
 
 ```bash
 curl -i -X POST http://localhost:3001/api/send/execute \
   -H 'Content-Type: application/json' \
-  -H 'Cookie: admin=<your-cookie>' \
+  -H 'Authorization: Bearer '$ADMIN_API_TOKEN \
   -d '{
     "job_id": "00000000-0000-0000-0000-0000000000bb",
+    "mode": "cohort",
     "dataset_id": "your-existing-dataset-uuid"
   }'
 ```
@@ -200,19 +241,30 @@ WHERE email = 'a@example.com';
 
 ### **`/api/send/execute`**
 
-**No `mode` parameter** - mode is auto-detected:
-
-- **Test mode:** Provide `test_emails[]`
-- **Cohort mode:** Provide `dataset_id`
+Supports both modern and legacy request bodies:
 
 ```json
-// Test mode
+// Modern: Test mode
+{
+  "job_id": "uuid",
+  "mode": "test",
+  "emails": ["email@example.com"]
+}
+
+// Modern: Cohort mode
+{
+  "job_id": "uuid",
+  "mode": "cohort",
+  "dataset_id": "uuid"
+}
+
+// Legacy: Test mode
 {
   "job_id": "uuid",
   "test_emails": ["email@example.com"]
 }
 
-// Cohort mode
+// Legacy: Cohort mode
 {
   "job_id": "uuid",
   "dataset_id": "uuid"

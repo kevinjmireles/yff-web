@@ -15,6 +15,7 @@ SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 MAKE_WEBHOOK_URL=...
 MAKE_SHARED_TOKEN=...
+ADMIN_API_TOKEN=...
 FEATURE_SEND_EXECUTE=1
 UNSUB_SECRET=...
 BASE_URL=https://yff-jp7s8zksi-kevinjmireles-projects.vercel.app
@@ -28,7 +29,15 @@ TEST_ACCESS_TOKEN=...
 ✅ 20251001_delivery_history.sql
 ✅ 20251001_provider_events.sql
 ✅ 20251001_unsubscribes.sql
+✅ 20251006_provider_msgid_unique.sql
+✅ 20251006_add_updated_at_delivery_history.sql (temporary column)
 ```
+
+### Test Data Convention
+- **Sentinel Dataset ID:** `00000000-0000-0000-0000-000000000001`
+- Auto-created by test mode execute to satisfy FK constraints
+- All test jobs use this dataset_id
+- Filter test data: `WHERE dataset_id = '00000000-0000-0000-0000-000000000001'`
 
 ### Admin Access
 - Admin cookie or session required
@@ -94,20 +103,21 @@ FEATURE_SEND_EXECUTE=1
 
 ---
 
-## Test 3: Test Mode (Explicit Emails)
+## Test 3: Execute Test Mode (Creates Rows for Callbacks)
 
-**Purpose:** Verify test mode with explicit email list
+**Purpose:** Verify test mode creates delivery_history rows with sentinel dataset
 
-**Note:** No `mode` parameter needed - auto-detected from presence of `test_emails[]`
+**Note:** Test mode now writes to database to enable callback testing
 
 ```bash
 curl -i -X POST https://yff-jp7s8zksi-kevinjmireles-projects.vercel.app/api/send/execute \
   -H 'Content-Type: application/json' \
-  -H 'Cookie: admin=<your-cookie>' \
+  -H 'Authorization: Bearer '$ADMIN_API_TOKEN \
   -H 'X-Request-Id: smoke-test-3' \
   -d '{
-    "job_id": "job-test-3",
-    "test_emails": ["alice@example.com", "bob@example.com", "alice@example.com"]
+    "job_id": "'$(uuidgen | tr 'A-Z' 'a-z')'",
+    "mode": "test",
+    "emails": ["alice@example.com", "bob@example.com"]
   }'
 ```
 
@@ -117,128 +127,163 @@ HTTP/1.1 200 OK
 {
   "ok": true,
   "data": {
-    "job_id": "job-test-3",
-    "dataset_id": null,
+    "job_id": "test-<uuid>",
+    "dataset_id": "00000000-0000-0000-0000-000000000001",
+    "batch_id": "<uuid>",
+    "selected": 2,
     "queued": 2,
-    "deduped": 1
+    "deduped": 0
   }
 }
 ```
 
-**Verify:**
+**Capture the `job_id` and `batch_id` for use in callback tests below.**
+
+**Verify Database:**
 ```sql
--- Check delivery_history
-SELECT job_id, email, status FROM delivery_history WHERE job_id = 'job-test-3';
--- Expected: 2 rows (alice@example.com, bob@example.com), status='queued'
+-- Check send_jobs row created
+SELECT id, dataset_id, status FROM send_jobs WHERE id = 'test-<uuid>';
+-- Expected: 1 row, dataset_id='00000000-0000-0000-0000-000000000001', status='pending'
+
+-- Check delivery_history rows created
+SELECT job_id, batch_id, email, status, dataset_id FROM delivery_history
+WHERE job_id = 'test-<uuid>';
+-- Expected: 2 rows (alice@example.com, bob@example.com), status='queued', dataset_id='00000000-0000-0000-0000-000000000001'
+
+-- Check test dataset exists
+SELECT id, name FROM content_datasets WHERE id = '00000000-0000-0000-0000-000000000001';
+-- Expected: 1 row, name='__test__'
 ```
 
 **Verify Make.com:**
 - Check webhook logs for payload:
   ```json
   {
-    "job_id": "job-test-3",
-    "dataset_id": null,
+    "job_id": "test-<uuid>",
+    "dataset_id": "00000000-0000-0000-0000-000000000001",
+    "batch_id": "<uuid>",
     "count": 2
   }
   ```
 
 ---
 
-## Test 4: Idempotency (Same Job)
+## Test 4: Provider Callback WITH provider_message_id (Idempotent)
 
-**Purpose:** Verify job-level deduplication prevents re-enqueuing
+**Purpose:** Verify callback updates pre-created rows and is idempotent
+
+**Prerequisites:** Use `job_id` and `batch_id` from Test 3
 
 ```bash
-# Call 1
-curl -i -X POST https://yff-jp7s8zksi-kevinjmireles-projects.vercel.app/api/send/execute \
+# Call 1: With provider_message_id
+curl -i -X POST https://yff-jp7s8zksi-kevinjmireles-projects.vercel.app/api/provider/callback \
   -H 'Content-Type: application/json' \
-  -H 'Cookie: admin=<your-cookie>' \
+  -H 'X-Shared-Token: $MAKE_SHARED_TOKEN' \
   -d '{
-    "job_id": "job-idem-4",
-    "test_emails": ["test@example.com"]
+    "job_id":"<JOB_ID_FROM_TEST_3>",
+    "batch_id":"<BATCH_ID_FROM_TEST_3>",
+    "results":[
+      {"email":"alice@example.com","status":"delivered","provider_message_id":"SG-123"},
+      {"email":"bob@example.com","status":"failed","provider_message_id":"SG-124","error":"bounce"}
+    ]
   }'
 
-# Call 2 (same job_id)
-curl -i -X POST https://yff-jp7s8zksi-kevinjmireles-projects.vercel.app/api/send/execute \
+# Call 2: Replay same payload (idempotency test)
+curl -i -X POST https://yff-jp7s8zksi-kevinjmireles-projects.vercel.app/api/provider/callback \
   -H 'Content-Type: application/json' \
-  -H 'Cookie: admin=<your-cookie>' \
+  -H 'X-Shared-Token: $MAKE_SHARED_TOKEN' \
   -d '{
-    "job_id": "job-idem-4",
-    "test_emails": ["test@example.com"]
+    "job_id":"<JOB_ID_FROM_TEST_3>",
+    "batch_id":"<BATCH_ID_FROM_TEST_3>",
+    "results":[
+      {"email":"alice@example.com","status":"delivered","provider_message_id":"SG-123"},
+      {"email":"bob@example.com","status":"failed","provider_message_id":"SG-124","error":"bounce"}
+    ]
   }'
 ```
 
-**Expected Call 1:**
+**Expected (both calls):**
 ```json
 {
   "ok": true,
   "data": {
-    "queued": 1,
-    "deduped": 0
+    "ok": true
   }
 }
 ```
 
-**Expected Call 2:**
-```json
-{
-  "ok": true,
-  "data": {
-    "queued": 0,
-    "deduped": 1
-  }
-}
-```
-
-**Verify:**
+**Verify Database:**
 ```sql
--- Should only have 1 row
-SELECT COUNT(*) FROM delivery_history WHERE job_id = 'job-idem-4';
--- Expected: 1
+-- Check delivery_history updated (not inserted)
+SELECT job_id, email, status, provider_message_id FROM delivery_history
+WHERE job_id = '<JOB_ID_FROM_TEST_3>';
+-- Expected: 2 rows
+-- alice@example.com, status='delivered', provider_message_id='SG-123'
+-- bob@example.com, status='failed', provider_message_id='SG-124'
+
+-- Verify no duplicates created
+SELECT COUNT(*) FROM delivery_history WHERE job_id = '<JOB_ID_FROM_TEST_3>';
+-- Expected: 2 (not 4)
 ```
 
 ---
 
-## Test 5: Dataset-Level Deduplication
+## Test 5: Provider Callback WITHOUT provider_message_id (Idempotent)
 
-**Purpose:** Verify dataset constraint prevents duplicate recipient across jobs
+**Purpose:** Verify fallback path works when provider doesn't supply message ID
 
-**Setup:**
-```sql
--- Manually insert a row (simulating previous send)
-INSERT INTO delivery_history (job_id, dataset_id, email, status)
-VALUES ('old-job', 'ds-nyc', 'nyc-resident@example.com', 'delivered');
-```
+**Prerequisites:** Use DIFFERENT `job_id` and `batch_id` from fresh execute (Test 3 again)
 
 ```bash
-# Try to send to same recipient with different job
-curl -i -X POST https://yff-jp7s8zksi-kevinjmireles-projects.vercel.app/api/send/execute \
+# Call 1: Without provider_message_id
+curl -i -X POST https://yff-jp7s8zksi-kevinjmireles-projects.vercel.app/api/provider/callback \
   -H 'Content-Type: application/json' \
-  -H 'Cookie: admin=<your-cookie>' \
+  -H 'X-Shared-Token: $MAKE_SHARED_TOKEN' \
   -d '{
-    "job_id": "new-job",
-    "dataset_id": "ds-nyc",
-    "test_emails": ["nyc-resident@example.com"]
+    "job_id":"<NEW_JOB_ID>",
+    "batch_id":"<NEW_BATCH_ID>",
+    "results":[
+      {"email":"alice@example.com","status":"delivered"},
+      {"email":"bob@example.com","status":"failed","error":"bounce"}
+    ]
+  }'
+
+# Call 2: Replay same payload (idempotency test)
+curl -i -X POST https://yff-jp7s8zksi-kevinjmireles-projects.vercel.app/api/provider/callback \
+  -H 'Content-Type: application/json' \
+  -H 'X-Shared-Token: $MAKE_SHARED_TOKEN' \
+  -d '{
+    "job_id":"<NEW_JOB_ID>",
+    "batch_id":"<NEW_BATCH_ID>",
+    "results":[
+      {"email":"alice@example.com","status":"delivered"},
+      {"email":"bob@example.com","status":"failed","error":"bounce"}
+    ]
   }'
 ```
 
-**Expected:**
+**Expected (both calls):**
 ```json
 {
   "ok": true,
   "data": {
-    "queued": 0,
-    "deduped": 1
+    "ok": true
   }
 }
 ```
 
-**Verify:**
+**Verify Database:**
 ```sql
--- Should still only have 1 row (the old one)
-SELECT job_id, dataset_id, email FROM delivery_history 
-WHERE dataset_id = 'ds-nyc' AND email = 'nyc-resident@example.com';
--- Expected: 1 row, job_id='old-job'
+-- Check delivery_history updated via composite key
+SELECT job_id, batch_id, email, status, provider_message_id FROM delivery_history
+WHERE job_id = '<NEW_JOB_ID>';
+-- Expected: 2 rows
+-- alice@example.com, status='delivered', provider_message_id=NULL
+-- bob@example.com, status='failed', provider_message_id=NULL
+
+-- Verify no duplicates created
+SELECT COUNT(*) FROM delivery_history WHERE job_id = '<NEW_JOB_ID>';
+-- Expected: 2 (not 4)
 ```
 
 ---
