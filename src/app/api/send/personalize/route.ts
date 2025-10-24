@@ -29,8 +29,9 @@ function buildDelegationHTML(opts: { job_id: string; batch_id: string; email: st
   u.searchParams.set('job_id', opts.job_id)
   u.searchParams.set('batch_id', opts.batch_id)
   u.searchParams.set('email', opts.email)
-  // Return inline HTML without wrapping <p> to avoid nested paragraph tags
-  return `If you can't email right now, you can <a href="${u.toString()}" target="_blank" rel="noopener noreferrer">delegate this action</a>.`
+  // Wrap in <p> to prevent orphaned text nodes when [[DELEGATION]] token is replaced
+  // This ensures valid HTML structure that SendGrid accepts (no bare text between tags)
+  return `<p>If you can't email right now, you can <a href="${u.toString()}" target="_blank" rel="noopener noreferrer">delegate this action</a>.</p>`
 }
 
 /**
