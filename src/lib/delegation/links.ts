@@ -1,16 +1,28 @@
 // src/lib/delegation/links.ts
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-// Use server-only env vars (guaranteed to be set in server context)
-// Fallback to NEXT_PUBLIC_* for backwards compatibility but prefer SUPABASE_URL
-const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const service = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Lazy initialization: create client on first use rather than at module load
+// This prevents crashes during import if env vars are missing (e.g., in test environments)
+let _admin: SupabaseClient | null = null
 
-if (!url || !service) {
-  throw new Error('Missing required env vars: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
+function getAdmin(): SupabaseClient {
+  if (!_admin) {
+    // Use server-only env vars (guaranteed to be set in server context)
+    // Fallback to NEXT_PUBLIC_* for backwards compatibility but prefer SUPABASE_URL
+    const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+    const service = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!url || !service) {
+      throw new Error(
+        'Missing required env vars: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. ' +
+        'These are required for delegation link operations.'
+      )
+    }
+
+    _admin = createClient(url, service, { auth: { persistSession: false } })
+  }
+  return _admin
 }
-
-const admin = createClient(url, service, { auth: { persistSession: false } })
 
 // Use BASE_URL if available, otherwise fall back to VERCEL_URL or localhost
 // Mirrors logic from personalize route for consistency
@@ -38,7 +50,7 @@ export async function ensureDelegationLink(
   const baseUrl = getBaseUrl()
   const link = `${baseUrl}/delegate?job_id=${job_id}&batch_id=${batch_id}&email=${encodeURIComponent(email)}`
 
-  const { data, error } = await admin
+  const { data, error } = await getAdmin()
     .from('delegation_links')
     .upsert(
       { email, url: link, batch_id, job_id },
@@ -67,7 +79,7 @@ export async function ensureDelegationLink(
  * @returns The delegation URL for this job, or null if none found
  */
 export async function latestDelegationUrl(email: string, job_id: string): Promise<string | null> {
-  const { data, error } = await admin
+  const { data, error } = await getAdmin()
     .from('delegation_links')
     .select('url')
     .eq('email', email)
