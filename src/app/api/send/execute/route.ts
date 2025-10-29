@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
     const linkFailures = linkResults.filter(r => r.status === 'rejected')
     if (linkFailures.length > 0) {
       console.error(`[execute] Failed to create ${linkFailures.length}/${unique.length} delegation links for job ${job_id}:`,
-        linkFailures.map(r => r.status === 'rejected' ? r.reason : null))
+        linkFailures.map(r => r.status === 'rejected' ? String(r.reason?.message || r.reason) : null))
     }
 
     // Dispatch to Make (best effort) with batch_id
@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
   const linkFailures = linkResults.filter(r => r.status === 'rejected')
   if (linkFailures.length > 0) {
     console.error(`[execute] Failed to create ${linkFailures.length}/${insertedSet.size} delegation links for job ${job_id}:`,
-      linkFailures.map(r => r.status === 'rejected' ? r.reason : null))
+      linkFailures.map(r => r.status === 'rejected' ? String(r.reason?.message || r.reason) : null))
   }
 
   // Dispatch to Make (best effort with 5s timeout)
