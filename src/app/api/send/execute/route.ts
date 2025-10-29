@@ -5,6 +5,7 @@ import { jsonOk, jsonErrorWithId } from '@/lib/api'
 import { FEATURE_SEND_EXECUTE } from '@/lib/features'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { ensureDelegationLink } from '@/lib/delegation/links'
 
 const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL
 const TEST_DATASET_ID = '00000000-0000-0000-0000-000000000001'
@@ -172,6 +173,17 @@ export async function POST(req: NextRequest) {
 
     if (insertErr) return jsonErrorWithId(req, 'INSERT_ERROR', insertErr.message, 500)
 
+    // Pre-create delegation links for all recipients (idempotent)
+    const linkResults = await Promise.allSettled(
+      unique.map(email => ensureDelegationLink(email, batch_id, job_id))
+    )
+    // Log any failed link creations (but don't block send)
+    const linkFailures = linkResults.filter(r => r.status === 'rejected')
+    if (linkFailures.length > 0) {
+      console.error(`[execute] Failed to create ${linkFailures.length}/${unique.length} delegation links for job ${job_id}:`,
+        linkFailures.map(r => r.status === 'rejected' ? r.reason : null))
+    }
+
     // Dispatch to Make (best effort) with batch_id
     if (!MAKE_WEBHOOK_URL) {
       return jsonErrorWithId(req, 'DISPATCH_FAILED', 'MAKE_WEBHOOK_URL missing', 500)
@@ -231,6 +243,17 @@ export async function POST(req: NextRequest) {
 
   const insertedSet = new Set((inserted ?? []).map((r) => r.email))
   const dedupedCount = recipients.length - insertedSet.size
+
+  // Pre-create delegation links for all successfully queued recipients (idempotent)
+  const linkResults = await Promise.allSettled(
+    Array.from(insertedSet).map(email => ensureDelegationLink(email, batch_id, job_id))
+  )
+  // Log any failed link creations (but don't block send)
+  const linkFailures = linkResults.filter(r => r.status === 'rejected')
+  if (linkFailures.length > 0) {
+    console.error(`[execute] Failed to create ${linkFailures.length}/${insertedSet.size} delegation links for job ${job_id}:`,
+      linkFailures.map(r => r.status === 'rejected' ? r.reason : null))
+  }
 
   // Dispatch to Make (best effort with 5s timeout)
   if (!MAKE_WEBHOOK_URL) {

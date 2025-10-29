@@ -11,6 +11,7 @@ import {
   type ContentRow
 } from '@/lib/personalize/helpers'
 import { metricRowsFromOcdIds, type MetricRow } from '@/lib/geo/fromOcd'
+import { resolveTokens } from '@/lib/personalize/tokens'
 
 const QuerySchema = z.object({
   job_id: z.string().uuid(),
@@ -18,35 +19,6 @@ const QuerySchema = z.object({
   email: z.string().email(),
   dataset_id: z.string().uuid().optional(),
 })
-
-// Use Vercel's VERCEL_URL for all environments (production, preview, local)
-const BASE_URL = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : 'http://localhost:3000'
-
-function buildDelegationHTML(opts: { job_id: string; batch_id: string; email: string }) {
-  const u = new URL('/delegate', BASE_URL)
-  u.searchParams.set('job_id', opts.job_id)
-  u.searchParams.set('batch_id', opts.batch_id)
-  u.searchParams.set('email', opts.email)
-  // Wrap in <p> to prevent orphaned text nodes when [[DELEGATION]] token is replaced
-  // This ensures valid HTML structure that SendGrid accepts (no bare text between tags)
-  return `<p>If you can't email right now, you can <a href="${u.toString()}" target="_blank" rel="noopener noreferrer">delegate this action</a>.</p>`
-}
-
-/**
- * Replace tokens with dynamic content.
- * Supports: [[DELEGATION]], [[EMAIL]], [[JOB_ID]], [[BATCH_ID]]
- * Extend this later for more tokens (e.g., [[FIRST_NAME]]).
- */
-function resolveTokens(html: string, ctx: { job_id: string; batch_id: string; email: string }) {
-  let out = html ?? ''
-  out = out.replace(/\[\[DELEGATION\]\]/g, buildDelegationHTML(ctx))
-  out = out.replace(/\[\[EMAIL\]\]/g, ctx.email)
-  out = out.replace(/\[\[JOB_ID\]\]/g, ctx.job_id)
-  out = out.replace(/\[\[BATCH_ID\]\]/g, ctx.batch_id)
-  return out
-}
 
 function htmlToText(html: string) {
   return html
@@ -157,7 +129,7 @@ export async function GET(req: NextRequest) {
   // Prefer body_html, fall back to body_md (Option C)
   const baseHtml = selected?.body_html ?? selected?.body_md ?? '<p>Thanks for staying engaged.</p>'
 
-  const resolvedHtml = resolveTokens(baseHtml, { job_id, batch_id, email })
+  const resolvedHtml = await resolveTokens(baseHtml, { job_id, batch_id, email })
   const text = htmlToText(resolvedHtml)
 
   return NextResponse.json({ ok: true, job_id, batch_id, email, subject, html: resolvedHtml, text })
