@@ -129,7 +129,8 @@ export async function GET(req: NextRequest) {
   // Prefer body_html, fall back to body_md (Option C)
   const baseHtml = selected?.body_html ?? selected?.body_md ?? '<p>Thanks for staying engaged.</p>'
 
-  const resolvedHtml = await resolveTokens(baseHtml, { job_id, batch_id, email })
+  // Pass ocd_ids to avoid extra DB lookup in token resolution
+  const resolvedHtml = await resolveTokens(baseHtml, { job_id, batch_id, email, ocd_ids: userOcdIds })
   const text = htmlToText(resolvedHtml)
 
   return NextResponse.json({ ok: true, job_id, batch_id, email, subject, html: resolvedHtml, text })

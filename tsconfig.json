@@ -32,7 +32,8 @@
     "next-env.d.ts",
     "next.config.*",
     "postcss.config.*",
-    "scripts/**/*",
+    "scripts/**/*.js",
+    "scripts/**/*.ts",
     "src/**/*",
     "tailwind.config.*",
     ".next/types/**/*.ts"
@@ -40,6 +41,7 @@
   "exclude": [
     "node_modules",
     ".next",
-    "supabase"
+    "supabase",
+    "scripts/**/*.mjs"
   ]
 }
